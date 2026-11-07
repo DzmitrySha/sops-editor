@@ -227,6 +227,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
           <li>The temporary plaintext is removed in <code>finally</code>.</li>
         </ol>
         <p>The file on disk is either the old or the new ciphertext at any moment. Plaintext is never written to disk.</p>
+        <p>Line endings are preserved: a CRLF file (Windows) is written back as CRLF. Line endings do not affect the change view or the “unsaved changes” marker.</p>
         <h3>Key rotation</h3>
         <p>The “Keys” button in the editor toolbar is available for encrypted files and offers two modes:</p>
         <ul>

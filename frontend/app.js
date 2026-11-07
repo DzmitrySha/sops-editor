@@ -14,6 +14,7 @@
     key: null,
     file: null,
     original: "",
+    eol: "\n",
     editor: null,
     suppressChange: 0,
     dirty: false,
@@ -100,6 +101,14 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
+  }
+
+  function normalizeEol(text) {
+    return String(text || "").replace(/\r\n?/g, "\n");
+  }
+
+  function detectEol(text) {
+    return /\r\n/.test(String(text || "")) ? "\r\n" : "\n";
   }
 
   function formatBytes(bytes) {
@@ -1128,7 +1137,8 @@
   function applyFile(file) {
     state.file = file;
     state.pendingKeyInfo = null;
-    state.original = file.content;
+    state.original = normalizeEol(file.content);
+    state.eol = detectEol(file.content);
     state.dirty = false;
     state.parsed = null;
     state.leaves = [];
@@ -1148,7 +1158,7 @@
     $("commitBranch").textContent = "git";
     applyFormat(file.format);
     state.suppressChange += 1;
-    state.editor.setValue(file.content);
+    state.editor.setValue(state.original);
     state.editor.clearHistory();
     state.editor.setCursor({ line: 0, ch: 0 });
     state.suppressChange -= 1;
@@ -1236,6 +1246,7 @@
     if (!force && state.dirty) return;
     state.file = null;
     state.original = "";
+    state.eol = "\n";
     state.dirty = false;
     state.parsed = null;
     state.leaves = [];
@@ -1604,6 +1615,7 @@
     if (!state.file || state.busy) return;
     if (!state.editor) return;
     const content = state.editor.getValue();
+    const payload = state.eol === "\r\n" ? content.replace(/\n/g, "\r\n") : content;
     if (!content.trim()) {
       toast("Не сохранено", "Документ пуст.", "bad");
       return;
@@ -1624,7 +1636,7 @@
         method: "POST",
         body: {
           path: state.file.path,
-          content,
+          content: payload,
           format: state.file.format,
           expected_sha256: state.file.sha256,
         },
@@ -1642,7 +1654,7 @@
       state.file = {
         ...state.file,
         sha256: result.sha256,
-        content: result.content,
+        content: normalizeEol(result.content),
         size: result.size,
         content_size: result.content_size,
         mtime: result.mtime,
@@ -1651,9 +1663,10 @@
         git: result.git,
         savedAt: Date.now(),
       };
-      state.original = result.content;
+      state.original = normalizeEol(result.content);
+      state.eol = detectEol(result.content);
       state.suppressChange += 1;
-      state.editor.setValue(result.content);
+      state.editor.setValue(state.original);
       state.editor.setCursor(cursor);
       state.editor.scrollTo(null, scroll);
       state.suppressChange -= 1;
@@ -1678,7 +1691,7 @@
       } else {
         toast("Сохранено", result.backup ? `Резервная копия: ${result.backup.id}` : "Файл зашифрован обратно.", "ok");
       }
-      if (result.content !== content) {
+      if (normalizeEol(result.content) !== content) {
         toast("Формат обновлён", "SOPS нормализовал отступы/комментарии при шифровании.", "");
       }
     } catch (error) {
@@ -2012,7 +2025,7 @@
   function renderSplitDiff(container, left, right) {
     container.innerHTML = "";
     const parts = window.Diff
-      ? Diff.diffLines(left || "", right || "")
+      ? Diff.diffLines(normalizeEol(left), normalizeEol(right))
       : [{ value: right || "", added: true }];
     let added = 0;
     let removed = 0;
