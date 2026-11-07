@@ -181,6 +181,41 @@ def test_basic_auth(workspace):
         assert response.json()["auth_enabled"] is True
 
 
+def test_header_auth_mode(workspace):
+    from fastapi.testclient import TestClient
+
+    settings = workspace["settings"].model_copy(
+        update={"auth_mode": "header", "auth_header": "X-Forwarded-User"}
+    )
+    app = create_app(settings)
+    with TestClient(app) as client:
+        assert client.get("/api/status").status_code == 401
+        assert "www-authenticate" not in client.get("/api/status").headers
+        assert client.get("/api/health").status_code == 200
+        ok = client.get("/api/status", headers={"X-Forwarded-User": "alice"})
+        assert ok.status_code == 200
+        assert ok.json()["user"] == "alice"
+        assert ok.json()["auth_mode"] == "header"
+        assert ok.json()["auth_enabled"] is True
+
+
+def test_header_auth_rejects_untrusted_peer(workspace):
+    from fastapi.testclient import TestClient
+
+    settings = workspace["settings"].model_copy(
+        update={
+            "auth_mode": "header",
+            "auth_header": "X-Forwarded-User",
+            "auth_trusted_proxies": "10.0.0.0/8",
+        }
+    )
+    app = create_app(settings)
+    with TestClient(app) as client:
+        # The TestClient peer host ("testclient") is not an IP, so it is untrusted.
+        response = client.get("/api/status", headers={"X-Forwarded-User": "alice"})
+        assert response.status_code == 401
+
+
 def test_json_and_dotenv_round_trip(workspace):
     root = workspace["root"]
     json_plain = root / "secrets" / "app.json"

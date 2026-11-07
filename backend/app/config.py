@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import os
 from pathlib import Path
 
@@ -40,6 +41,11 @@ class Settings(BaseSettings):
 
     auth_user: str = "sops"
     auth_password: SecretStr | None = None
+    # basic (default) | header (identity supplied by an OIDC-aware reverse proxy) | none
+    auth_mode: str = Field(default="basic", pattern="^(basic|header|none)$")
+    auth_header: str = Field(default="X-Forwarded-User", max_length=64)
+    # Comma separated IPs/CIDRs of the proxies whose header is trusted.
+    auth_trusted_proxies: str = ""
 
     max_file_bytes: int = 5 * 1024 * 1024
     session_ttl_seconds: int = 8 * 60 * 60
@@ -84,7 +90,24 @@ class Settings(BaseSettings):
 
     @property
     def auth_enabled(self) -> bool:
+        if self.auth_mode == "none":
+            return False
+        if self.auth_mode == "header":
+            return True
         return bool(self.auth_password and self.auth_password.get_secret_value())
+
+    @property
+    def auth_trusted_networks(self) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+        networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+        for item in self.auth_trusted_proxies.split(","):
+            item = item.strip()
+            if not item:
+                continue
+            try:
+                networks.append(ipaddress.ip_network(item, strict=False))
+            except ValueError as exc:
+                raise ValueError(f"Некорректный SOPS_EDITOR_AUTH_TRUSTED_PROXIES: {item}") from exc
+        return networks
 
     @property
     def effective_age_key_file(self) -> Path | None:

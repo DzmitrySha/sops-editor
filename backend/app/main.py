@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import ipaddress
 import json
 import os
 import re
@@ -77,6 +78,11 @@ class PullRequest(BaseModel):
     path: str = Field(min_length=1, max_length=4096)
 
 
+class RotateRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=4096)
+    mode: str = Field(default="updatekeys", pattern="^(updatekeys|rotate)$")
+
+
 # ------------------------------------------------------------------- helpers
 def _error_response(exc: AppError) -> JSONResponse:
     return JSONResponse(
@@ -111,6 +117,24 @@ def _effective_host(request: Request, settings: Settings) -> str | None:
     if settings.trust_proxy:
         host = request.headers.get("x-forwarded-host", host)
     return host
+
+
+def _header_user(request: Request, settings: Settings) -> str | None:
+    networks = settings.auth_trusted_networks
+    if networks:
+        peer_ip = request.client.host if request.client else ""
+        try:
+            peer = ipaddress.ip_address(peer_ip)
+        except ValueError:
+            return None
+        if not any(peer in network for network in networks):
+            return None
+    value = request.headers.get(settings.auth_header, "").strip()
+    if not value or len(value) > 200:
+        return None
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+        return None
+    return value
 
 
 def _set_session_cookie(response: Response, request: Request, settings: Settings, sid: str) -> None:
@@ -357,11 +381,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info("SOPS Editor {} starting; roots={}", settings.version, [str(r) for r in guard.roots])
+        if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", settings.auth_header):
+            raise RuntimeError("Некорректный SOPS_EDITOR_AUTH_HEADER")
+        settings.auth_trusted_networks  # raises ValueError on a bad CIDR
+        if settings.auth_mode == "header" and not settings.auth_trusted_networks:
+            logger.warning(
+                "SOPS_EDITOR_AUTH_MODE=header без SOPS_EDITOR_AUTH_TRUSTED_PROXIES: "
+                "заголовок {} принимается с любого адреса",
+                settings.auth_header,
+            )
         if not settings.auth_enabled and (settings.trust_proxy or settings.cookie_secure):
             raise RuntimeError(
-                "SOPS_EDITOR_AUTH_PASSWORD обязателен при SOPS_EDITOR_TRUST_PROXY/COOKIE_SECURE"
+                "Нужна аутентификация при SOPS_EDITOR_TRUST_PROXY/COOKIE_SECURE: "
+                "задайте SOPS_EDITOR_AUTH_PASSWORD или SOPS_EDITOR_AUTH_MODE=header"
             )
-        if not settings.auth_enabled:
+        if settings.auth_mode == "basic" and not settings.auth_enabled:
             logger.warning("HTTP Basic auth отключён: задайте SOPS_EDITOR_AUTH_PASSWORD")
         if settings.effective_age_key_file is None and _ambient_key_source() == "none":
             logger.warning("Серверный age-ключ не найден: пользователь должен задать ключ в UI")
@@ -393,26 +427,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         started = time.monotonic()
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} or path.startswith("/api/"):
             logger.debug("--> {} {}", request.method, path)
-        # HTTP Basic auth, except for the container health probe.
+        # Authentication, except for the container health probe.
         if settings.auth_enabled and path != "/api/health":
-            header = request.headers.get("authorization", "")
-            valid = False
-            if header.lower().startswith("basic "):
-                try:
-                    decoded = base64.b64decode(header[6:].strip(), validate=True).decode("utf-8")
-                    user, _, password = decoded.partition(":")
-                    valid = secrets.compare_digest(user, settings.auth_user) and secrets.compare_digest(
-                        password, settings.auth_password.get_secret_value()  # type: ignore[union-attr]
+            if settings.auth_mode == "header":
+                user = _header_user(request, settings)
+                if user is None:
+                    return JSONResponse(
+                        status_code=401,
+                        content={"error": {"code": "unauthorized", "message": "Требуется авторизация"}},
                     )
-                except Exception:
-                    valid = False
-            if not valid:
-                response = JSONResponse(
-                    status_code=401,
-                    content={"error": {"code": "unauthorized", "message": "Требуется авторизация"}},
-                )
-                response.headers["WWW-Authenticate"] = 'Basic realm="SOPS Editor", charset="UTF-8"'
-                return response
+                request.state.user = user
+            else:
+                header = request.headers.get("authorization", "")
+                valid = False
+                if header.lower().startswith("basic "):
+                    try:
+                        decoded = base64.b64decode(header[6:].strip(), validate=True).decode("utf-8")
+                        user, _, password = decoded.partition(":")
+                        valid = secrets.compare_digest(user, settings.auth_user) and secrets.compare_digest(
+                            password, settings.auth_password.get_secret_value()  # type: ignore[union-attr]
+                        )
+                    except Exception:
+                        valid = False
+                if not valid:
+                    response = JSONResponse(
+                        status_code=401,
+                        content={"error": {"code": "unauthorized", "message": "Требуется авторизация"}},
+                    )
+                    response.headers["WWW-Authenticate"] = 'Basic realm="SOPS Editor", charset="UTF-8"'
+                    return response
 
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             origin = request.headers.get("origin")
@@ -585,6 +628,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {
             "version": settings.version,
             "auth_enabled": settings.auth_enabled,
+            "auth_mode": settings.auth_mode,
+            "user": getattr(request.state, "user", None),
             "roots": [
                 {
                     "path": str(root),
@@ -770,6 +815,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/encrypt")
     def encrypt_file(request: Request, body: EncryptRequest, op: str | None = None):
         return _tracked(op, lambda progress: _encrypt_impl(request, body, progress))
+
+    @app.post("/api/keys/rotate")
+    def rotate_keys(request: Request, body: RotateRequest, op: str | None = None):
+        key = _key_material(request, settings, sessions)
+
+        def work(progress):
+            result = editor.rotate_keys(body.path, body.mode, key, progress)
+            logger.info(
+                "Keys {} for {} ({} recipients, verified={})",
+                body.mode,
+                result["path"],
+                len(result["encrypted"].get("age_recipients") or []),
+                result["verified"],
+            )
+            return result
+
+        return _tracked(op, work)
 
     @app.get("/api/browse")
     async def browse(request: Request, path: str | None = None, hidden: bool = False):
@@ -995,6 +1057,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def git_status(path: str):
         resolved = guard.resolve_file(path)
         return {"git": git.repo_info(resolved)}
+
+    @app.get("/api/git/diff")
+    def git_diff(request: Request, path: str, op: str | None = None):
+        key = _key_material(request, settings, sessions)
+
+        def work(progress):
+            return editor.git_diff(path, key, progress)
+
+        return _tracked(op, work)
 
     @app.post("/api/git/commit")
     async def git_commit(body: CommitRequest):

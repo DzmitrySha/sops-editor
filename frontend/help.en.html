@@ -28,9 +28,10 @@
         <a href="#keys">Keys</a>
         <a href="#keyless">No key</a>
         <a href="#local">File from computer</a>
-        <a href="#encrypt">Encrypt from scratch</a>
         <a href="#server">Server file</a>
+        <a href="#encrypt">Encrypt from scratch</a>
         <a href="#git">Git</a>
+        <a href="#auth">Authentication</a>
         <a href="#save">How saving works</a>
         <a href="#ui">All features</a>
         <a href="#troubleshooting">Troubleshooting</a>
@@ -108,7 +109,7 @@ grep 'public key' keys/age.txt          # age1… — add it to .sops.yaml
       </section>
 
       <section class="doc-section" id="keyless">
-        <h2>2.1. Files exist, no key</h2>
+        <h2>3. Files exist, no key</h2>
         <div class="doc-note warn"><p>This is not a bug. A SOPS file contains only <em>public</em> recipients; the private key is not inside. Without the private key of at least one recipient decryption is impossible — it cannot be brute-forced, that is the point of encryption.</p></div>
 
         <h3>Step 1. Find out which key is needed</h3>
@@ -144,7 +145,7 @@ gpg --decrypt secrets.enc.yaml                    # PGP, if the key is in the ke
       </section>
 
       <section class="doc-section" id="local">
-        <h2>3. File from your computer (local git clone)</h2>
+        <h2>4. File from your computer (local git clone)</h2>
         <ol>
           <li>Open the <strong>“From computer”</strong> tab.</li>
           <li>Press <strong>“Choose file”</strong> (standard browser dialog — always works) or drag a file into the drop zone. A status line appears under the button: name, size, stage (“Uploading…” / error / “opened”). An <strong>unencrypted</strong> YAML/JSON/dotenv/INI file also opens in the editor; the <strong>“Encrypt”</strong> button in the editor creates the SOPS version.</li>
@@ -158,7 +159,7 @@ gpg --decrypt secrets.enc.yaml                    # PGP, if the key is in the ke
       </section>
 
       <section class="doc-section" id="server">
-        <h2>4. File on the server</h2>
+        <h2>5. File on the server</h2>
         <ul>
           <li><strong>Path manually:</strong> <code>/workspace/secrets/app.enc.yaml</code> — a path inside the container.</li>
           <li><strong>Browse:</strong> “Browse” opens the tree of allowed directories; double-click to enter/open, “Search the tree” to find by name.</li>
@@ -168,7 +169,7 @@ gpg --decrypt secrets.enc.yaml                    # PGP, if the key is in the ke
       </section>
 
       <section class="doc-section" id="encrypt">
-        <h2>5. Encrypt a file from scratch</h2>
+        <h2>6. Encrypt a file from scratch</h2>
         <p>Open a plain YAML/JSON/dotenv/INI file (server, git or computer) — it opens in the editor. Press <strong>“Encrypt”</strong> in the editor toolbar: the server runs <code>sops encrypt</code> and creates a sibling file (<code>secret.yaml</code> → <code>secret.enc.yaml</code>); the original stays untouched. The encrypted file opens right away.</p>
         <h3>Recipients</h3>
         <ul>
@@ -184,20 +185,39 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
       </section>
 
       <section class="doc-section" id="git">
-        <h2>6. Git</h2>
+        <h2>7. Git</h2>
         <table class="doc-table">
           <thead><tr><th>Button</th><th>What it does</th></tr></thead>
           <tbody>
             <tr><td>Commit</td><td><code>git add -- file</code> + <code>git commit -- file</code>; only the open file is committed. The “push” checkbox pushes after the commit.</td></tr>
             <tr><td>↻ (pull)</td><td><code>git pull --ff-only</code>, only with a clean worktree. The file is reloaded after the pull.</td></tr>
+            <tr><td>Diff with HEAD</td><td>Decrypts the <code>HEAD</code> version and the current file and shows them side by side in two columns with line numbers. Both sides are decrypted in the server process; the browser receives plaintext, exactly as when opening the file.</td></tr>
             <tr><td>From git</td><td><code>git clone</code> into <code>/data/repos/&lt;name&gt;</code>.</td></tr>
           </tbody>
         </table>
         <p>For private HTTPS repositories set <code>SOPS_EDITOR_GIT_TOKEN</code> (GitLab: <code>oauth2</code>, GitHub: <code>x-access-token</code>); the token never comes from the UI. For SSH mount a key or an agent. Clone hosts can be restricted with <code>SOPS_EDITOR_GIT_ALLOWED_HOSTS</code>.</p>
       </section>
 
+      <section class="doc-section" id="auth">
+        <h2>8. Authentication</h2>
+        <p>The mode is set by <code>SOPS_EDITOR_AUTH_MODE</code>. Basic auth is the default; a trusted-header mode exists for an OIDC proxy in front of the app.</p>
+        <table class="doc-table">
+          <thead><tr><th>Mode</th><th>What is checked</th><th>Use when</th></tr></thead>
+          <tbody>
+            <tr><td><code>basic</code> (default)</td><td><code>Authorization: Basic</code>, user <code>SOPS_EDITOR_AUTH_USER</code>, password <code>SOPS_EDITOR_AUTH_PASSWORD</code></td><td>direct access, small team</td></tr>
+            <tr><td><code>header</code></td><td><code>SOPS_EDITOR_AUTH_HEADER</code> (default <code>X-Forwarded-User</code>) is non-empty</td><td>an OIDC proxy (oauth2-proxy, Authentik, Traefik forward-auth) already authenticated the user</td></tr>
+            <tr><td><code>none</code></td><td>nothing</td><td>loopback demo only</td></tr>
+          </tbody>
+        </table>
+        <p><code>SOPS_EDITOR_AUTH_TRUSTED_PROXIES</code> is a comma-separated list of IPs/CIDRs. When set, the header is honoured only from those addresses; when empty, any client may set it and the server logs a warning at startup. In <code>header</code> mode the <code>401</code> response carries no <code>WWW-Authenticate</code>, so the browser shows no password dialog.</p>
+        <p><strong>Never expose <code>header</code> mode directly:</strong> the header is easy to forge. Keep the port on loopback or an internal network and let only the proxy reach it. <code>GET /api/status</code> returns the current mode and the header identity — handy for a check:</p>
+        <pre><code>curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status
+# {"auth_mode":"header","user":"alice", ...}</code></pre>
+        <p>With Traefik, attach an oauth2-proxy middleware to the router and give the container <code>SOPS_EDITOR_AUTH_MODE=header</code> plus the proxy subnet in <code>SOPS_EDITOR_AUTH_TRUSTED_PROXIES</code>.</p>
+      </section>
+
       <section class="doc-section" id="save">
-        <h2>7. How saving works</h2>
+        <h2>9. How saving works</h2>
         <ol>
           <li>The server compares the SHA-256 of the submitted ciphertext with the current file — protection against overwriting someone else’s edit (<code>409 conflict</code>).</li>
           <li>Creates a ciphertext backup in <code>/data/backups/&lt;hash&gt;/</code> (10 per file by default).</li>
@@ -206,10 +226,17 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
           <li>The temporary plaintext is removed in <code>finally</code>.</li>
         </ol>
         <p>The file on disk is either the old or the new ciphertext at any moment. Plaintext is never written to disk.</p>
+        <h3>Key rotation</h3>
+        <p>The “Keys” button in the editor toolbar is available for encrypted files and offers two modes:</p>
+        <ul>
+          <li><strong>Update recipients from .sops.yaml</strong> — <code>sops updatekeys --yes</code>. Recipients are recalculated from the repository rules, values are not re-encrypted, only the wrapped data key changes. The change list (<code>+++</code>/<code>---</code>) is shown in the dialog.</li>
+          <li><strong>Rotate the data key</strong> — <code>sops rotate --in-place</code>. A new data key is generated, every value is re-encrypted and the MAC is recalculated.</li>
+        </ul>
+        <p>Before running, the server creates a ciphertext backup; afterwards it decrypts the file and compares the content semantically (formatting ignored). If the check fails or sops returns an error, the original ciphertext is restored atomically. When the new recipient set no longer includes the current key, plaintext cannot be verified: the operation succeeds with a warning and the file can only be opened with a key of the new recipient.</p>
       </section>
 
       <section class="doc-section" id="ui">
-        <h2>8. All UI features</h2>
+        <h2>10. All UI features</h2>
         <table class="doc-table">
           <thead><tr><th>Element</th><th>Purpose</th></tr></thead>
           <tbody>
@@ -226,7 +253,8 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
             <tr><td>Save</td><td>SOPS files are encrypted with <code>sops edit</code>; plain files are written as is. The button shows “Encrypting…” while it works.</td></tr>
             <tr><td>Encrypt (in editor)</td><td>Appears for a plain file: creates the SOPS version with recipients from <code>.sops.yaml</code> or the server key.</td></tr>
             <tr><td>Backups</td><td>List and download encrypted copies.</td></tr>
-            <tr><td>Git panel</td><td>Branch, state, last commit, commit, pull.</td></tr>
+            <tr><td>Keys</td><td>For an encrypted file: recalculate recipients from <code>.sops.yaml</code> (<code>sops updatekeys</code>) or rotate the data key (<code>sops rotate</code>) — with a ciphertext backup and verification.</td></tr>
+            <tr><td>Git panel</td><td>Branch, state, last commit, commit, pull, “Diff with HEAD” — a decrypted comparison with the last commit.</td></tr>
             <tr><td>Local file</td><td>Download the result / write it to the source file.</td></tr>
             <tr><td>? in the header</td><td>This documentation, opens in a new tab.</td></tr>
           </tbody>
@@ -235,7 +263,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
       </section>
 
       <section class="doc-section" id="troubleshooting">
-        <h2>9. Troubleshooting</h2>
+        <h2>11. Troubleshooting</h2>
         <table class="doc-table">
           <thead><tr><th>Symptom</th><th>Cause and fix</th></tr></thead>
           <tbody>
@@ -255,7 +283,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
       </section>
 
       <section class="doc-section" id="limits">
-        <h2>10. Limits</h2>
+        <h2>12. Limits</h2>
         <ul>
           <li>Formats: YAML, JSON, dotenv, INI. Binary SOPS files (archives, arbitrary data) are not supported.</li>
           <li>Recipients and KMS policy are not changed: use <code>sops updatekeys</code>/<code>rotate</code> for rotation.</li>
@@ -266,12 +294,12 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
       </section>
 
       <section class="doc-section" id="api">
-        <h2>11. API (for automation)</h2>
+        <h2>13. API (for automation)</h2>
         <table class="doc-table">
           <thead><tr><th>Method and path</th><th>Purpose</th></tr></thead>
           <tbody>
             <tr><td><code>GET /api/health</code></td><td>Status and sops version.</td></tr>
-            <tr><td><code>GET /api/status</code></td><td>Roots, auth, key source, limits.</td></tr>
+            <tr><td><code>GET /api/status</code></td><td>Roots, auth mode and user, key source, limits.</td></tr>
             <tr><td><code>GET /api/browse?path=</code></td><td>Directory listing.</td></tr>
             <tr><td><code>GET /api/search?q=&amp;path=</code></td><td>Search files by name.</td></tr>
             <tr><td><code>GET /api/file?path=</code></td><td>Decrypt and open (plain files too).</td></tr>
@@ -285,6 +313,8 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
             <tr><td><code>GET /api/backups?path=</code>, <code>GET /api/backups/{id}?path=</code></td><td>List and download backups.</td></tr>
             <tr><td><code>POST/DELETE /api/session/key</code></td><td>Set/forget the tab age key.</td></tr>
             <tr><td><code>GET /api/git?path=</code>, <code>POST /api/git/commit|push|pull|clone</code></td><td>Git operations.</td></tr>
+            <tr><td><code>GET /api/git/diff?path=&amp;op=</code></td><td>The decrypted current file and its <code>HEAD</code> version, for a side-by-side comparison.</td></tr>
+            <tr><td><code>POST /api/keys/rotate</code></td><td>Key rotation (JSON: path, mode = <code>updatekeys</code> | <code>rotate</code>). Long operation: pass <code>op=</code> and poll <code>/api/ops/{id}</code>.</td></tr>
           </tbody>
         </table>
         <p>All mutating requests require the <code>X-SOPS-Editor: 1</code> header; with Basic auth enabled, standard authorization too.</p>

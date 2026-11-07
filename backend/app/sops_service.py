@@ -148,6 +148,13 @@ class SopsRunner:
                 status_code=422,
                 details={"operation": operation},
             )
+        if "failed to parse input" in low or "malformed recipient" in low or "invalid checksum" in low:
+            raise SopsFailure(
+                "Некорректный age-получатель в .sops.yaml",
+                code="invalid_recipient",
+                status_code=422,
+                details={"operation": operation},
+            )
         if "could not run editor" in low or "refusing to reopen" in low:
             raise SopsFailure(
                 "SOPS отклонил изменения: проверьте синтаксис YAML/JSON",
@@ -366,6 +373,34 @@ class SopsRunner:
             args.append(str(plain))
             result = self._run(args, key=KeyMaterial(), cwd=plain.parent)
         self._raise_for_result(result, "encrypt")
+
+    def update_keys(self, path: Path, fmt: str, key: KeyMaterial) -> str:
+        """Re-encrypt the data key for the recipients from .sops.yaml; returns sops stdout."""
+        result = self._run(
+            [self.sops_bin, "updatekeys", "--yes", "--input-type", fmt, str(path)],
+            key=key,
+            cwd=path.parent,
+        )
+        self._raise_for_result(result, "updatekeys")
+        return result.stdout.decode("utf-8", errors="replace").strip()
+
+    def rotate(self, path: Path, fmt: str, key: KeyMaterial) -> None:
+        """Generate a new data key and re-encrypt every value in place."""
+        result = self._run(
+            [
+                self.sops_bin,
+                "rotate",
+                "--in-place",
+                "--input-type",
+                fmt,
+                "--output-type",
+                fmt,
+                str(path),
+            ],
+            key=key,
+            cwd=path.parent,
+        )
+        self._raise_for_result(result, "rotate")
 
     def public_recipients_from_file(self, key_file: Path) -> list[str]:
         """Derive public age recipients from a private key file (cached by mtime)."""

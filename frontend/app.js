@@ -25,6 +25,7 @@
     pendingPath: null,
     pendingKeyInfo: null,
     pendingPlainFile: null,
+    pendingGitDiff: null,
     encrypt: null,
     progressTimer: null,
     progressStarted: 0,
@@ -177,6 +178,22 @@
     ["encrypt", "Шифруем через sops edit"],
     ["verify", "Проверяем результат расшифровкой"],
     ["git", "Обновляем git-статус"],
+  ];
+  const ROTATE_STEPS = [
+    ["resolve", "Проверяем файл"],
+    ["read", "Читаем шифротекст"],
+    ["decrypt", "Расшифровываем текущую версию"],
+    ["backup", "Создаём резервную копию"],
+    ["rekey", "Обновляем ключи"],
+    ["verify", "Проверяем результат"],
+    ["git", "Обновляем git-статус"],
+  ];
+  const GIT_DIFF_STEPS = [
+    ["resolve", "Проверяем путь и git"],
+    ["read", "Читаем текущий файл"],
+    ["decrypt", "Расшифровываем текущую версию"],
+    ["head", "Читаем версию из HEAD"],
+    ["git", "Читаем состояние git"],
   ];
 
   function progressItem(phase, text, className) {
@@ -652,6 +669,11 @@
     $("btnDiff").disabled = !hasFile;
     $("btnCommit").disabled = !hasGit || state.busy;
     $("btnPull").disabled = !hasGit || state.busy;
+    $("btnGitDiff").disabled = !hasGit || state.busy;
+    $("btnRotateKeys").classList.toggle(
+      "hidden",
+      !hasFile || state.busy || !state.file || state.file.encrypted_file !== true,
+    );
     $("btnEncryptFile").classList.toggle(
       "hidden",
       !hasFile || state.busy || !state.file || state.file.encrypted_file !== false,
@@ -1452,6 +1474,98 @@
     }
   }
 
+  // ------------------------------------------------------------------ rotate
+  function showRotateError(text) {
+    const node = $("rotateError");
+    node.textContent = text;
+    node.classList.toggle("hidden", !text);
+  }
+
+  function openRotateModal() {
+    if (!state.file || state.file.encrypted_file !== true) return;
+    $("rotateTarget").innerHTML =
+      `<p><strong>Файл:</strong> <span class="mono">${escapeHtml(state.file.path)}</span></p>` +
+      `<p><strong>Получатели:</strong> ${escapeHtml(((state.file.encrypted || {}).age_recipients || []).join(", ") || "—")}</p>`;
+    document.querySelector('input[name="rotateMode"][value="updatekeys"]').checked = true;
+    $("rotateResult").textContent = "";
+    $("rotateResult").classList.add("hidden");
+    $("rotateWarning").classList.add("hidden");
+    showRotateError("");
+    $("btnRotateRun").classList.remove("hidden");
+    $("btnRotateRun").disabled = false;
+    $("btnRotateRun").textContent = "Выполнить";
+    openModal("rotateModal");
+  }
+
+  async function runRotate() {
+    if (!state.file || state.busy) return;
+    const mode = document.querySelector('input[name="rotateMode"]:checked').value;
+    const ok = await showConfirm({
+      title: "Ротация ключей",
+      text: mode === "rotate"
+        ? "Будет создан новый ключ данных и перешифрованы все значения. Продолжить?"
+        : "Получатели будут пересчитаны по .sops.yaml. Данные не перешифровываются. Продолжить?",
+      okLabel: "Выполнить",
+    });
+    if (!ok) return;
+    state.busy = true;
+    $("btnRotateRun").disabled = true;
+    $("btnRotateRun").textContent = "Выполняем…";
+    showRotateError("");
+    updateActionButtons();
+    try {
+      const result = await trackedOperation({
+        url: "/api/keys/rotate",
+        method: "POST",
+        body: { path: state.file.path, mode },
+        steps: ROTATE_STEPS,
+        title: "Ротация ключей",
+        subtitle: state.file.name,
+      });
+      state.file = {
+        ...state.file,
+        sha256: result.sha256,
+        size: result.size,
+        mtime: result.mtime,
+        encrypted: result.encrypted,
+        encrypted_file: true,
+        git: result.git,
+      };
+      renderFileChips();
+      renderGit();
+      updateStatus();
+      updateActionButtons();
+      if (!result.changed) {
+        toast("Без изменений", "Получатели уже соответствуют .sops.yaml.", "ok");
+        closeModal("rotateModal");
+        return;
+      }
+      $("btnRotateRun").classList.add("hidden");
+      const output = $("rotateResult");
+      output.textContent = (result.output || []).join("\n") || "sops: ok";
+      output.classList.remove("hidden");
+      const warning = $("rotateWarning");
+      warning.textContent = result.warning || "";
+      warning.classList.toggle("hidden", !result.warning);
+      const who = (result.encrypted.age_recipients || []).join(", ") || "—";
+      toast("Ключи обновлены", who, "ok");
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "key_required") {
+        state.pendingKeyInfo = (error.details && error.details.encrypted) || null;
+        closeModal("rotateModal");
+        openKeyModal("Ключ не подходит для этого файла. Задайте другой приватный ключ.");
+      } else {
+        showRotateError(error.message || String(error));
+      }
+    } finally {
+      hideProgress();
+      state.busy = false;
+      $("btnRotateRun").disabled = false;
+      $("btnRotateRun").textContent = "Выполнить";
+      updateActionButtons();
+    }
+  }
+
   // -------------------------------------------------------------------- save
   async function saveFile() {
     if (!state.file || state.busy) return;
@@ -1748,6 +1862,104 @@
     openModal("diffModal");
   }
 
+  function gitDiffNote() {
+    return state.dirty
+      ? "В редакторе есть несохранённые правки — в дифф они не входят."
+      : "";
+  }
+
+  function openGitDiff() {
+    if (!state.file || !state.file.git) return;
+    const holder = $("gitDiffView");
+    holder.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+    $("gitDiffSummary").textContent = "";
+    $("gitDiffNote").textContent = gitDiffNote();
+    openModal("gitDiffModal");
+    trackedOperation({
+      url: `/api/git/diff?path=${encodeURIComponent(state.file.path)}`,
+      steps: GIT_DIFF_STEPS,
+      title: "Дифф с HEAD",
+      subtitle: state.file.name,
+    })
+      .then((data) => renderGitDiff(data))
+      .catch((error) => {
+        if (error instanceof ApiError && error.code === "key_required") {
+          state.pendingGitDiff = state.file.path;
+          state.pendingKeyInfo = (error.details && error.details.encrypted) || null;
+          closeModal("gitDiffModal");
+          openKeyModal("Ключ не подходит для этого файла. Задайте другой приватный ключ.");
+          return;
+        }
+        $("gitDiffView").innerHTML = "";
+        $("gitDiffView").append(emptyNode(error.message || String(error)));
+      })
+      .finally(() => hideProgress());
+  }
+
+  function renderGitDiff(data) {
+    const head = data.head;
+    const view = $("gitDiffView");
+    view.innerHTML = "";
+    $("gitDiffNote").textContent = head === null
+      ? "Файл ещё не закоммичен: вся версия новая."
+      : gitDiffNote();
+    if (head && head.binary) {
+      view.append(emptyNode("Бинарный файл — дифф недоступен."));
+      $("gitDiffSummary").textContent = "";
+      return;
+    }
+    const left = head ? head.content : "";
+    const right = data.current.content || "";
+    const parts = window.Diff ? Diff.diffLines(left, right) : [{ value: right, added: true }];
+    let added = 0;
+    let removed = 0;
+    let ln = 0;
+    let rn = 0;
+    for (const part of parts) {
+      const lines = part.value.replace(/\n$/, "").split("\n");
+      if (part.added) added += lines.length;
+      if (part.removed) removed += lines.length;
+      for (const line of lines) {
+        const row = document.createElement("div");
+        row.className = "diff-row";
+        const leftNum = document.createElement("span");
+        const leftCell = document.createElement("span");
+        const rightNum = document.createElement("span");
+        const rightCell = document.createElement("span");
+        leftNum.className = "diff-num";
+        rightNum.className = "diff-num";
+        leftCell.className = "diff-cell";
+        rightCell.className = "diff-cell";
+        if (part.removed) {
+          ln += 1;
+          leftNum.textContent = ln;
+          leftCell.textContent = line;
+          leftCell.classList.add("del");
+        } else if (part.added) {
+          rn += 1;
+          rightNum.textContent = rn;
+          rightCell.textContent = line;
+          rightCell.classList.add("add");
+        } else {
+          ln += 1;
+          rn += 1;
+          leftNum.textContent = ln;
+          rightNum.textContent = rn;
+          leftCell.textContent = line;
+          rightCell.textContent = line;
+        }
+        row.append(leftNum, leftCell, rightNum, rightCell);
+        view.append(row);
+      }
+    }
+    const commit = head && head.commit;
+    $("gitDiffSummary").innerHTML =
+      `<span class="add">+${added}</span> / <span class="del">−${removed}</span> · строк` +
+      (commit
+        ? ` · HEAD ${escapeHtml(commit.hash)} · ${escapeHtml(commit.subject)}`
+        : "");
+  }
+
   // -------------------------------------------------------------------- picker
   function openPicker(path) {
     state.picker.search = false;
@@ -1966,7 +2178,11 @@
       if (state.pendingPath) {
         const path = state.pendingPath;
         state.pendingPath = null;
-        openFile(path, { force: true });
+        await openFile(path, { force: true });
+      }
+      if (state.pendingGitDiff) {
+        state.pendingGitDiff = null;
+        openGitDiff();
       }
     } catch (error) {
       toast("Ключ не принят", error.message, "bad");
@@ -2095,6 +2311,9 @@
       if (entry && entry.type === "file") openEncryptModal({ path: entry.path, name: entry.name });
     });
     $("btnEncryptRun").addEventListener("click", runEncrypt);
+    $("btnRotateKeys").addEventListener("click", openRotateModal);
+    $("btnRotateRun").addEventListener("click", runRotate);
+    $("btnGitDiff").addEventListener("click", openGitDiff);
     $("btnDownloadLocal").addEventListener("click", downloadLocalFile);
     $("btnWriteLocal").addEventListener("click", writeLocalFile);
     const dropZone = $("localDrop");

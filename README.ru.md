@@ -231,6 +231,9 @@ docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
 | `SOPS_EDITOR_STORAGE` | `/data` | бэкапы, загрузки, клоны, логи |
 | `SOPS_AGE_KEY_FILE` | `/keys/age.txt` (если есть) | приватный age-ключ |
 | `SOPS_EDITOR_AUTH_USER` / `_PASSWORD` | `sops` / пусто | HTTP Basic auth |
+| `SOPS_EDITOR_AUTH_MODE` | `basic` | `basic` · `header` (OIDC-прокси) · `none` |
+| `SOPS_EDITOR_AUTH_HEADER` | `X-Forwarded-User` | заголовок личности в режиме `header` |
+| `SOPS_EDITOR_AUTH_TRUSTED_PROXIES` | пусто | список IP/CIDR, которым разрешено его ставить |
 | `SOPS_EDITOR_MAX_FILE_BYTES` | `5242880` | лимит файла |
 | `SOPS_EDITOR_BACKUP_KEEP` | `10` | копий на файл |
 | `SOPS_EDITOR_SESSION_TTL_SECONDS` | `28800` | TTL ключа в UI |
@@ -261,6 +264,8 @@ docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
 | POST / DELETE | `/api/session/key` | задать / забыть age-ключ вкладки |
 | GET | `/api/git?path=` | git status |
 | POST | `/api/git/commit` · `/push` · `/pull` · `/clone` | git-действия |
+| GET | `/api/git/diff?path=&op=` | расшифрованный файл и его версия из `HEAD` |
+| POST | `/api/keys/rotate` | ротация ключей `updatekeys` / `rotate` (`{path, mode}`) |
 
 Встроенная справка следует языку приложения: `?lang=ru` или `?lang=en` на
 `/help.html`.
@@ -311,9 +316,9 @@ docs/               деплой, безопасность, скриншоты (
 - [x] Открытые файлы и «зашифровать с нуля»
 - [x] Реальный прогресс вместо буферизованного ответа
 - [x] Интерфейс и документация RU/EN
-- [ ] Ротация ключей (`sops updatekeys` / `rotate`) из UI
-- [ ] Diff расшифрованных значений рядом с git-версией
-- [ ] Опциональный OIDC перед Basic auth
+- [x] Ротация ключей (`sops updatekeys` / `rotate`) из UI
+- [x] Diff расшифрованных значений рядом с git-версией
+- [x] Опциональный OIDC перед Basic auth (доверенный заголовок от прокси)
 
 ## Ограничения
 

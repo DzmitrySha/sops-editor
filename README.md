@@ -233,6 +233,9 @@ standard `SOPS_AGE_KEY_FILE` / `SOPS_AGE_KEY`):
 | `SOPS_EDITOR_STORAGE` | `/data` | backups, uploads, cloned repositories, logs |
 | `SOPS_AGE_KEY_FILE` | `/keys/age.txt` (if present) | private age key |
 | `SOPS_EDITOR_AUTH_USER` / `_PASSWORD` | `sops` / empty | HTTP Basic auth |
+| `SOPS_EDITOR_AUTH_MODE` | `basic` | `basic` · `header` (OIDC proxy) · `none` |
+| `SOPS_EDITOR_AUTH_HEADER` | `X-Forwarded-User` | identity header trusted in `header` mode |
+| `SOPS_EDITOR_AUTH_TRUSTED_PROXIES` | empty | IP/CIDR list allowed to set that header |
 | `SOPS_EDITOR_MAX_FILE_BYTES` | `5242880` | file size limit |
 | `SOPS_EDITOR_BACKUP_KEEP` | `10` | ciphertext copies per file |
 | `SOPS_EDITOR_SESSION_TTL_SECONDS` | `28800` | UI key TTL |
@@ -263,6 +266,8 @@ standard `SOPS_AGE_KEY_FILE` / `SOPS_AGE_KEY`):
 | POST / DELETE | `/api/session/key` | set / forget the tab age key |
 | GET | `/api/git?path=` | git status |
 | POST | `/api/git/commit` · `/push` · `/pull` · `/clone` | git actions |
+| GET | `/api/git/diff?path=&op=` | decrypted file and its `HEAD` version |
+| POST | `/api/keys/rotate` | `updatekeys` / `rotate` re-keying (`{path, mode}`) |
 
 The interactive documentation follows the app language: `?lang=en` on
 `/help.html`.
@@ -313,9 +318,9 @@ docs/               deployment, security, screenshots (ru/ for Russian)
 - [x] Plaintext files and "encrypt from scratch"
 - [x] Real progress instead of buffered responses
 - [x] RU/EN interface and documentation
-- [ ] Key rotation helper (`sops updatekeys` / `rotate`) from the UI
-- [ ] Git diff view with decrypted values side by side
-- [ ] Optional OIDC in front of Basic auth
+- [x] Key rotation helper (`sops updatekeys` / `rotate`) from the UI
+- [x] Git diff view with decrypted values side by side
+- [x] Optional OIDC in front of Basic auth (trusted header from a reverse proxy)
 
 ## Limits
 

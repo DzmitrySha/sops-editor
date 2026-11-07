@@ -86,6 +86,49 @@ prefixed and does not clash with other projects. TLS terminates on Traefik.
 - Basic auth is checked by the application; Traefik can additionally enforce an
   IP allowlist.
 
+### Authentication
+
+`SOPS_EDITOR_AUTH_MODE` selects how a request is authenticated.
+
+| Mode | What is checked | Use when |
+|---|---|---|
+| `basic` (default) | `Authorization: Basic`, user `SOPS_EDITOR_AUTH_USER`, password `SOPS_EDITOR_AUTH_PASSWORD` | direct access, small team |
+| `header` | `SOPS_EDITOR_AUTH_HEADER` (default `X-Forwarded-User`) is non-empty | an OIDC proxy (oauth2-proxy, Authentik, Traefik forward-auth) already authenticated the user |
+| `none` | nothing (only `/api/health` is ever public otherwise) | loopback-only demo |
+
+```dotenv
+SOPS_EDITOR_AUTH_MODE=header
+SOPS_EDITOR_AUTH_HEADER=X-Forwarded-User
+SOPS_EDITOR_AUTH_TRUSTED_PROXIES=172.18.0.0/16
+```
+
+`SOPS_EDITOR_AUTH_TRUSTED_PROXIES` is a comma-separated list of IPs/CIDRs. When
+set, the header is honoured only if the TCP peer is inside one of them; when
+empty, any peer may set it and the container logs a warning at startup.
+Header mode answers `401` without `WWW-Authenticate`, so the browser shows no
+password dialog.
+
+**Never expose header mode directly.** The header is trivially spoofable: keep
+the port on loopback or an internal network and let only the proxy reach it.
+
+oauth2-proxy + Traefik example:
+
+```yaml
+ai-sops-edit:
+  labels:
+    - traefik.http.routers.ai-sops-edit.middlewares=oauth2-proxy@docker
+  environment:
+    SOPS_EDITOR_AUTH_MODE: header
+    SOPS_EDITOR_AUTH_TRUSTED_PROXIES: 172.18.0.0/16
+```
+
+Check without a browser:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8787/api/status              # 401
+curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status | grep alice      # user alice
+```
+
 ## Permissions and the container
 
 - The container runs as root inside its namespaces with `read_only: true`,

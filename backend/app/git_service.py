@@ -147,6 +147,22 @@ class GitService:
             "remote": remote,
         }
 
+    def head_blob(self, path: Path) -> bytes | None:
+        """Content of ``path`` at HEAD, or None when the file is not committed."""
+        root = self.find_root(path)
+        if root is None:
+            raise BadRequest("Файл не входит в git-репозиторий", code="not_a_repo")
+        relative = path.resolve().relative_to(root).as_posix()
+        exists = self._run(
+            ["git", "-C", str(root), "cat-file", "-e", f"HEAD:{relative}"], cwd=root
+        )
+        if exists.returncode != 0:
+            return None
+        result = self._run(["git", "-C", str(root), "show", f"HEAD:{relative}"], cwd=root)
+        if result.returncode != 0:
+            raise BadRequest("Не удалось прочитать версию из HEAD", code="git_failed")
+        return result.stdout
+
     def _author_args(self, root: Path) -> list[str]:
         args: list[str] = []
         for key, default in (

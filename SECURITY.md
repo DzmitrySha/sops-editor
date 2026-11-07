@@ -33,10 +33,12 @@ This tool works with private keys and plaintext secrets. The threat model is
 ## Required measures for a server
 
 1. **HTTPS** (Traefik) — otherwise the key and plaintext travel in clear.
-2. **Basic auth**: a long random `SOPS_EDITOR_AUTH_PASSWORD`; empty means
-   localhost only. With `SOPS_EDITOR_TRUST_PROXY=true` or
-   `SOPS_EDITOR_COOKIE_SECURE=true` the container **refuses to start** without a
-   password.
+2. **Authentication** is mandatory once the port leaves loopback. Either Basic
+   auth with a long random `SOPS_EDITOR_AUTH_PASSWORD`, or
+   `SOPS_EDITOR_AUTH_MODE=header` behind an OIDC proxy. With
+   `SOPS_EDITOR_TRUST_PROXY=true` or `SOPS_EDITOR_COOKIE_SECURE=true` the
+   container **refuses to start** without one of them. `SOPS_EDITOR_AUTH_MODE=none`
+   is for loopback only.
 3. **Network access**: do not publish the port to the internet; Traefik/allowlist
    only.
 4. **Keys**: `keys/age.txt` with mode `600`, a dedicated key for the tool when
@@ -51,7 +53,9 @@ This tool works with private keys and plaintext secrets. The threat model is
 
 - **The server sees plaintext** while a request is processed. That is inherent to
   server-side SOPS. If unacceptable, run the tool locally on the workstation.
-- **Basic auth is not SSO**; put an OIDC proxy in front if needed.
+- **Basic auth is not SSO**; use `SOPS_EDITOR_AUTH_MODE=header` behind an OIDC
+  proxy. In that mode the identity header is trusted — an attacker who can reach
+  the container directly can impersonate any user, so restrict the network.
 - **XSS**: all dynamic text is rendered via `textContent`/escaping; no third-party
   CDNs. Review the CSP when adding libraries.
 - **CSRF**: Basic auth + Origin check + SameSite. Mutating requests accept JSON;

@@ -381,6 +381,43 @@
     "Ошибка сохранения и не удалось восстановить исходный файл. Используйте резервную копию.": "Saving failed and the original file could not be restored. Use the backup.",
     "Слишком много получателей (максимум 20).": "Too many recipients (maximum 20).",
     "Некорректный идентификатор операции": "Invalid operation id",
+    "Ключи": "Keys",
+    "Ключи файла": "File keys",
+    "Обновить получателей из .sops.yaml": "Update recipients from .sops.yaml",
+    "Перешифровывает только ключ данных: значения не меняются, получатели берутся из .sops.yaml.": "Re-encrypts only the data key: values stay the same, recipients come from .sops.yaml.",
+    "Перевыпустить ключ данных (sops rotate)": "Rotate the data key (sops rotate)",
+    "Новый ключ данных: все значения перешифровываются, MAC пересчитывается.": "New data key: every value is re-encrypted and the MAC is recalculated.",
+    "Выполнить": "Run",
+    "Выполняем…": "Running…",
+    "Ротация ключей": "Key rotation",
+    "Будет создан новый ключ данных и перешифрованы все значения. Продолжить?": "A new data key will be created and every value re-encrypted. Continue?",
+    "Получатели будут пересчитаны по .sops.yaml. Данные не перешифровываются. Продолжить?": "Recipients will be recalculated from .sops.yaml. Values are not re-encrypted. Continue?",
+    "Получатели уже соответствуют .sops.yaml.": "Recipients already match .sops.yaml.",
+    "Ключи обновлены": "Keys updated",
+    "Новый набор получателей не включает текущий ключ — открытый текст проверить не удалось.": "The new recipient set does not include the current key — plaintext could not be verified.",
+    "Файл не зашифрован SOPS": "The file is not SOPS-encrypted",
+    "Некорректный режим ротации ключей": "Invalid key rotation mode",
+    "Некорректный age-получатель в .sops.yaml": "Invalid age recipient in .sops.yaml",
+    "Проверяем файл": "Checking the file",
+    "Читаем шифротекст": "Reading the ciphertext",
+    "Обновляем ключи": "Updating keys",
+    "Проверяем результат": "Verifying the result",
+    "Обновляем получателей через sops updatekeys": "Updating recipients with sops updatekeys",
+    "Перевыпускаем ключ данных через sops rotate": "Rotating the data key with sops rotate",
+    "SOPS не сохранил метаданные ключей": "SOPS did not keep the key metadata",
+    "Проверка после ротации не прошла: содержимое изменилось. Исходный файл восстановлен.": "Post-rotation verification failed: the content changed. The original file was restored.",
+    "Ошибка ротации и не удалось восстановить исходный файл. Используйте резервную копию.": "Rotation failed and the original file could not be restored. Use the backup.",
+    "Дифф с HEAD": "Diff with HEAD",
+    "Файл ещё не закоммичен: вся версия новая.": "The file is not committed yet: the whole version is new.",
+    "Бинарный файл — дифф недоступен.": "Binary file — diff is not available.",
+    "В редакторе есть несохранённые правки — в дифф они не входят.": "The editor has unsaved changes — they are not part of the diff.",
+    "Проверяем путь и git": "Checking path and git",
+    "Читаем текущий файл": "Reading the current file",
+    "Читаем версию из HEAD": "Reading the HEAD version",
+    "Файл не входит в git-репозиторий": "The file is not inside a git repository",
+    "Не удалось прочитать версию из HEAD": "Could not read the HEAD version",
+    "Файл:": "File:",
+    "Получатели:": "Recipients:",
   };
 
   // ------------------------------------------------------- dynamic patterns
@@ -443,7 +480,7 @@
     const element = node.nodeType === 1 ? node : node.parentElement;
     if (!element) return true;
     if (SKIP_TAGS.has(element.tagName)) return true;
-    return Boolean(element.closest(".CodeMirror, #secretsList, .diff-view, .lang-switch"));
+    return Boolean(element.closest(".CodeMirror, #secretsList, .diff-view, .diff-cols, .lang-switch"));
   }
 
   function translateElement(root) {

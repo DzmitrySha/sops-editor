@@ -72,8 +72,37 @@ class EditorService:
                 unique.append(candidate)
         return unique
 
-    def _decrypt_with_format(self, path: Path, fmt: str, key: KeyMaterial) -> str:
-        return self.sops.decrypt(path, fmt, key)
+    def _decrypt_source(
+        self, source: Path, data: bytes, key: KeyMaterial
+    ) -> tuple[str, str, bool]:
+        """Return (plaintext, format, is_encrypted) for ``data`` read from ``source``."""
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise UnsupportedFormat(
+                "Бинарные SOPS-файлы не поддерживаются веб-редактором"
+            ) from exc
+        candidates = self._format_candidates(source)
+        preferred = guess_encrypted_format(text)
+        if preferred:
+            candidates = [preferred] + [item for item in candidates if item != preferred]
+        last_error: Exception | None = None
+        for fmt in candidates:
+            try:
+                return self.sops.decrypt(source, fmt, key), fmt, True
+            except KeyRequired as exc:
+                # Public metadata is readable without any private key:
+                # tell the user exactly which recipients are required.
+                exc.details = {
+                    **exc.details,
+                    "encrypted": summarize_sops_metadata(text, fmt),
+                }
+                raise
+            except SopsFailure as exc:
+                if exc.code == "not_sops":
+                    return text, detect_format(source, text).name, False
+                last_error = exc
+        raise last_error or SopsFailure("Не удалось расшифровать файл")
 
     def open_file(
         self, raw_path: str, key: KeyMaterial, progress: Progress | None = None
@@ -96,37 +125,7 @@ class EditorService:
             candidates = [preferred] + [item for item in candidates if item != preferred]
         _emit(progress, "decrypt", f"Расшифровываем ({preferred or candidates[0]}, sops decrypt)")
 
-        last_error: Exception | None = None
-        content: str | None = None
-        used_format: str | None = None
-        is_encrypted = True
-        for fmt in candidates:
-            try:
-                content = self._decrypt_with_format(path, fmt, key)
-                used_format = fmt
-                break
-            except KeyRequired as exc:
-                # Public metadata is readable without any private key:
-                # tell the user exactly which recipients are required.
-                exc.details = {
-                    **exc.details,
-                    "encrypted": summarize_sops_metadata(encrypted_text, fmt),
-                }
-                raise
-            except SopsFailure as exc:
-                last_error = exc
-                if exc.code == "not_sops":
-                    # Plain file: open it as-is, encrypting is a later step.
-                    is_encrypted = False
-                    break
-                continue
-        if not is_encrypted:
-            content = encrypted_text
-            used_format = detect_format(path, content).name
-        elif content is None or used_format is None:
-            if isinstance(last_error, SopsFailure):
-                raise last_error
-            raise SopsFailure("Не удалось расшифровать файл")
+        content, used_format, is_encrypted = self._decrypt_source(path, encrypted_bytes, key)
 
         _emit(progress, "format", f"Определяем формат: {used_format}")
         info = format_info(used_format)
@@ -328,6 +327,191 @@ class EditorService:
                 ),
                 "encrypted_file": True,
             }
+
+    # ------------------------------------------------------------- rotate
+    def rotate_keys(
+        self,
+        raw_path: str,
+        mode: str,
+        key: KeyMaterial,
+        progress: Progress | None = None,
+    ) -> dict:
+        """Re-key an encrypted file in place (``updatekeys``) or rotate its data key."""
+        if mode not in ("updatekeys", "rotate"):
+            raise BadRequest("Некорректный режим ротации ключей")
+        _emit(progress, "resolve", "Проверяем файл")
+        path = self.guard.resolve_file(raw_path)
+        with self._locks.lock(str(path)):
+            _emit(progress, "read", "Читаем шифротекст")
+            original = read_bounded(path, self.settings.max_file_bytes)
+            before_sha = _sha(original)
+            try:
+                ciphertext = original.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise UnsupportedFormat(
+                    "Бинарные SOPS-файлы не поддерживаются веб-редактором"
+                ) from exc
+            fmt = guess_encrypted_format(ciphertext) or detect_format(path, ciphertext).name
+            if not self.sops.is_encrypted(path):
+                raise Conflict("Файл не зашифрован SOPS", code="not_encrypted")
+            _emit(progress, "decrypt", "Расшифровываем текущую версию")
+            plain_before = self.sops.decrypt(path, fmt, key)
+            _emit(progress, "backup", "Создаём резервную копию шифротекста")
+            backup = self.backups.create(path, original)
+            try:
+                if mode == "updatekeys":
+                    _emit(progress, "rekey", "Обновляем получателей через sops updatekeys")
+                    output = self.sops.update_keys(path, fmt, key)
+                else:
+                    _emit(progress, "rekey", "Перевыпускаем ключ данных через sops rotate")
+                    self.sops.rotate(path, fmt, key)
+                    output = ""
+                new_bytes = read_bounded(path, self.settings.max_file_bytes)
+                _emit(progress, "verify", "Проверяем результат")
+                summary = summarize_sops_metadata(
+                    new_bytes.decode("utf-8", errors="replace"), fmt
+                )
+                if not summary.get("key_types"):
+                    raise SopsFailure(
+                        "SOPS не сохранил метаданные ключей",
+                        code="rekey_failed",
+                        status_code=500,
+                    )
+                verified = "plaintext"
+                warning = None
+                try:
+                    plain_after = self.sops.decrypt(path, fmt, key)
+                except KeyRequired:
+                    verified = "ciphertext"
+                    warning = (
+                        "Новый набор получателей не включает текущий ключ — "
+                        "открытый текст проверить не удалось."
+                    )
+                else:
+                    if not semantic_equal(plain_before, plain_after, fmt):
+                        raise SopsFailure(
+                            "Проверка после ротации не прошла: содержимое изменилось. "
+                            "Исходный файл восстановлен.",
+                            code="verify_failed",
+                            status_code=500,
+                        )
+            except Exception as exc:
+                restore_error: Exception | None = None
+                try:
+                    write_atomic(path, original)
+                except Exception as restore_exc:  # noqa: BLE001
+                    restore_error = restore_exc
+                    logger.critical(
+                        "FATAL: cannot restore {} from backup {}: {}",
+                        path,
+                        backup.get("id"),
+                        restore_exc,
+                    )
+                if restore_error is not None:
+                    raise SopsFailure(
+                        "Ошибка ротации и не удалось восстановить исходный файл. "
+                        "Используйте резервную копию.",
+                        code="restore_failed",
+                        status_code=500,
+                        details={"backup": backup.get("id")},
+                    ) from exc
+                raise
+            _emit(progress, "git", "Обновляем git-статус")
+            try:
+                git_info = self.git.repo_info(path)
+            except Exception:
+                git_info = None
+            stat = path.stat()
+            return {
+                "ok": True,
+                "path": str(path),
+                "mode": mode,
+                "changed": _sha(new_bytes) != before_sha,
+                "sha256": _sha(new_bytes),
+                "size": stat.st_size,
+                "mtime": round(stat.st_mtime, 3),
+                "output": [line for line in output.splitlines() if line.strip()][:100],
+                "verified": verified,
+                "warning": warning,
+                "encrypted": summary,
+                "backup": backup,
+                "git": git_info,
+            }
+
+    # ------------------------------------------------------------- git diff
+    def git_diff(
+        self, raw_path: str, key: KeyMaterial, progress: Progress | None = None
+    ) -> dict:
+        """Decrypted working-tree file and its HEAD version, for a side-by-side view."""
+        _emit(progress, "resolve", "Проверяем путь и git")
+        path = self.guard.resolve_file(raw_path)
+        root = self.git.find_root(path)
+        if root is None:
+            raise BadRequest("Файл не входит в git-репозиторий", code="not_a_repo")
+        _emit(progress, "read", "Читаем текущий файл")
+        current_bytes = read_bounded(path, self.settings.max_file_bytes)
+        _emit(progress, "decrypt", "Расшифровываем текущую версию")
+        current_text, current_fmt, current_encrypted = self._decrypt_source(
+            path, current_bytes, key
+        )
+        blob = self.git.head_blob(path)
+        head = None
+        if blob is not None:
+            _emit(progress, "head", "Расшифровываем версию из HEAD")
+            head = self._head_document(path, blob, key)
+        _emit(progress, "git", "Читаем состояние git")
+        try:
+            git_info = self.git.repo_info(path)
+        except Exception:
+            git_info = None
+        if head is not None and git_info is not None:
+            head["commit"] = git_info.get("last_commit")
+        return {
+            "path": str(path),
+            "root": str(root),
+            "relative_path": (git_info or {}).get("relative_path"),
+            "current": {
+                "content": current_text,
+                "format": current_fmt,
+                "encrypted_file": current_encrypted,
+                "sha256": _sha(current_bytes),
+            },
+            "head": head,
+            "git": git_info,
+        }
+
+    def _head_document(self, path: Path, blob: bytes, key: KeyMaterial) -> dict:
+        """Decrypt a HEAD blob in an isolated directory (no .sops.yaml needed)."""
+        sha = _sha(blob)
+        if b"\x00" in blob[:8192]:
+            return {
+                "binary": True,
+                "content": None,
+                "format": None,
+                "encrypted_file": None,
+                "sha256": sha,
+            }
+        with tempfile.TemporaryDirectory(prefix="sops-head-") as tmp:
+            candidate = Path(tmp) / path.name
+            candidate.write_bytes(blob)
+            os.chmod(candidate, 0o600)
+            try:
+                text, fmt, is_encrypted = self._decrypt_source(candidate, blob, key)
+            except UnsupportedFormat:
+                return {
+                    "binary": True,
+                    "content": None,
+                    "format": None,
+                    "encrypted_file": None,
+                    "sha256": sha,
+                }
+        return {
+            "binary": False,
+            "content": text,
+            "format": fmt,
+            "encrypted_file": is_encrypted,
+            "sha256": sha,
+        }
 
     # ------------------------------------------------------------- encrypt
     @staticmethod

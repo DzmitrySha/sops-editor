@@ -29,9 +29,10 @@
         <a href="#keys">Ключи</a>
         <a href="#keyless">Нет ключа</a>
         <a href="#local">Файл с компьютера</a>
-        <a href="#encrypt">Зашифровать с нуля</a>
         <a href="#server">Файл на сервере</a>
+        <a href="#encrypt">Зашифровать с нуля</a>
         <a href="#git">Git</a>
+        <a href="#auth">Аутентификация</a>
         <a href="#save">Как сохраняется</a>
         <a href="#ui">Все функции</a>
         <a href="#troubleshooting">Проблемы</a>
@@ -109,7 +110,7 @@ grep 'public key' keys/age.txt          # age1… — добавить в .sops.
       </section>
 
       <section class="doc-section" id="keyless">
-        <h2>2.1. Файлы есть, ключа нет</h2>
+        <h2>3. Файлы есть, ключа нет</h2>
         <div class="doc-note warn"><p>Это не сбой утилиты. Файл SOPS содержит только <em>публичные</em> получатели; приватного ключа в нём нет. Без приватного ключа хотя бы одного получателя расшифровка невозможна — подобрать его нельзя, это и есть защита.</p></div>
 
         <h3>Шаг 1. Узнать, какой ключ нужен</h3>
@@ -145,7 +146,7 @@ gpg --decrypt secrets.enc.yaml                    # PGP, если ключ в с
       </section>
 
       <section class="doc-section" id="local">
-        <h2>3. Файл с компьютера (локальный git-клон)</h2>
+        <h2>4. Файл с компьютера (локальный git-клон)</h2>
         <ol>
           <li>Откройте вкладку <strong>«С компьютера»</strong>.</li>
           <li>Нажмите <strong>«Выбрать файл»</strong> (стандартный диалог браузера — работает всегда) или перетащите файл в область выбора. Под кнопкой появится строка состояния: имя, размер, этап («Загружаем…» / ошибка / «открыт»). Можно выбрать и незашифрованный YAML/JSON/dotenv/INI — он откроется в редакторе, а кнопка <strong>«Зашифровать»</strong> в редакторе создаст SOPS-версию.</li>
@@ -159,7 +160,7 @@ gpg --decrypt secrets.enc.yaml                    # PGP, если ключ в с
       </section>
 
       <section class="doc-section" id="server">
-        <h2>4. Файл на сервере</h2>
+        <h2>5. Файл на сервере</h2>
         <ul>
           <li><strong>Путь вручную:</strong> <code>/workspace/secrets/app.enc.yaml</code> — путь внутри контейнера.</li>
           <li><strong>Обзор:</strong> кнопка «Обзор» открывает дерево разрешённых каталогов; двойной клик — вход/открытие, «Искать по дереву» — поиск по именам.</li>
@@ -169,7 +170,7 @@ gpg --decrypt secrets.enc.yaml                    # PGP, если ключ в с
       </section>
 
       <section class="doc-section" id="encrypt">
-        <h2>3.1. Зашифровать файл с нуля</h2>
+        <h2>6. Зашифровать файл с нуля</h2>
         <p>Утилита умеет не только редактировать существующие SOPS-файлы, но и шифровать открытые YAML/JSON/dotenv/INI.</p>
         <table class="doc-table">
           <thead><tr><th>Откуда файл</th><th>Как запустить</th></tr></thead>
@@ -192,20 +193,39 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
       </section>
 
       <section class="doc-section" id="git">
-        <h2>5. Git</h2>
+        <h2>7. Git</h2>
         <table class="doc-table">
           <thead><tr><th>Кнопка</th><th>Что делает</th></tr></thead>
           <tbody>
             <tr><td>Коммит</td><td><code>git add -- файл</code> + <code>git commit -- файл</code>; в коммит попадает только открытый файл. Галочка «запушить» делает push после коммита.</td></tr>
             <tr><td>↻ (pull)</td><td><code>git pull --ff-only</code>, только при чистом рабочем дереве. После pull файл перезагружается.</td></tr>
+            <tr><td>Дифф с HEAD</td><td>Расшифровывает версию из <code>HEAD</code> и текущий файл и показывает их рядом в две колонки с номерами строк. Обе стороны расшифровываются в памяти сервера, в браузер уходит уже открытый текст, как и при обычном открытии файла.</td></tr>
             <tr><td>Из git</td><td><code>git clone</code> в <code>/data/repos/&lt;имя&gt;</code>.</td></tr>
           </tbody>
         </table>
         <p>Для приватных HTTPS-репозиториев задайте <code>SOPS_EDITOR_GIT_TOKEN</code> (GitLab: <code>oauth2</code>, GitHub: <code>x-access-token</code>); токен не передаётся из UI. Для SSH смонтируйте ключ или агент. Хосты клонирования можно ограничить через <code>SOPS_EDITOR_GIT_ALLOWED_HOSTS</code>.</p>
       </section>
 
+      <section class="doc-section" id="auth">
+        <h2>8. Аутентификация</h2>
+        <p>Режим задаётся переменной <code>SOPS_EDITOR_AUTH_MODE</code>. По умолчанию — Basic auth; для входного OIDC-прокси есть режим доверенного заголовка.</p>
+        <table class="doc-table">
+          <thead><tr><th>Режим</th><th>Что проверяется</th><th>Когда использовать</th></tr></thead>
+          <tbody>
+            <tr><td><code>basic</code> (по умолчанию)</td><td><code>Authorization: Basic</code>, логин <code>SOPS_EDITOR_AUTH_USER</code>, пароль <code>SOPS_EDITOR_AUTH_PASSWORD</code></td><td>прямой доступ, небольшая команда</td></tr>
+            <tr><td><code>header</code></td><td>заголовок <code>SOPS_EDITOR_AUTH_HEADER</code> (по умолчанию <code>X-Forwarded-User</code>) непустой</td><td>OIDC-прокси (oauth2-proxy, Authentik, Traefik forward-auth) уже аутентифицировал пользователя</td></tr>
+            <tr><td><code>none</code></td><td>ничего</td><td>только loopback-демо</td></tr>
+          </tbody>
+        </table>
+        <p><code>SOPS_EDITOR_AUTH_TRUSTED_PROXIES</code> — список IP/CIDR через запятую. Если задан, заголовок принимается только с этих адресов; если пуст, заголовку верит любой клиент, и сервер пишет предупреждение при старте. В режиме <code>header</code> ответ <code>401</code> приходит без <code>WWW-Authenticate</code>, поэтому браузер не показывает окно пароля.</p>
+        <p><strong>Режим <code>header</code> нельзя открывать напрямую:</strong> заголовок легко подделать. Держите порт на loopback или внутренней сети, пускайте трафик только через прокси. <code>GET /api/status</code> возвращает текущий режим и имя пользователя из заголовка — это удобно для проверки:</p>
+        <pre><code>curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status
+# {"auth_mode":"header","user":"alice", ...}</code></pre>
+        <p>Пример для Traefik: на маршрут приложения навешивается middleware oauth2-proxy, а контейнеру задаются <code>SOPS_EDITOR_AUTH_MODE=header</code> и подсеть прокси в <code>SOPS_EDITOR_AUTH_TRUSTED_PROXIES</code>.</p>
+      </section>
+
       <section class="doc-section" id="save">
-        <h2>6. Как сохраняется файл</h2>
+        <h2>9. Как сохраняется файл</h2>
         <ol>
           <li>Сервер сверяет SHA-256 присланного шифротекста с текущим файлом — защита от перезаписи чужой правки (<code>409 conflict</code>).</li>
           <li>Создаёт резервную копию шифротекста в <code>/data/backups/&lt;hash&gt;/</code> (по умолчанию 10 на файл).</li>
@@ -214,10 +234,17 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
           <li>Временный открытый текст удаляется в <code>finally</code>.</li>
         </ol>
         <p>На диске в любой момент лежит либо старый, либо новый шифротекст. Открытый текст на диск не пишется.</p>
+        <h3>Ротация ключей</h3>
+        <p>Кнопка «Ключи» в тулбаре редактора доступна для зашифрованного файла и предлагает два режима:</p>
+        <ul>
+          <li><strong>Обновить получателей из .sops.yaml</strong> — <code>sops updatekeys --yes</code>. Получатели пересчитываются по правилам репозитория, значения не перешифровываются, меняется только зашифрованный ключ данных. Список изменений (<code>+++</code>/<code>---</code>) показывается в окне.</li>
+          <li><strong>Перевыпустить ключ данных</strong> — <code>sops rotate --in-place</code>. Создаётся новый ключ данных, все значения перешифровываются, MAC пересчитывается.</li>
+        </ul>
+        <p>Перед запуском сервер делает резервную копию шифротекста, после — расшифровывает файл и сравнивает содержимое (семантически, без учёта форматирования). Если проверка не прошла или sops вернул ошибку, исходный шифротекст восстанавливается атомарно. Когда новый набор получателей не включает текущий ключ, проверить открытый текст нельзя: операция завершается успешно с предупреждением, а файл потом открывается только ключом нового получателя.</p>
       </section>
 
       <section class="doc-section" id="ui">
-        <h2>7. Все функции интерфейса</h2>
+        <h2>10. Все функции интерфейса</h2>
         <table class="doc-table">
           <thead><tr><th>Элемент</th><th>Назначение</th></tr></thead>
           <tbody>
@@ -235,7 +262,8 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
             <tr><td>Сохранить</td><td>Для SOPS-файла — шифрование через <code>sops edit</code>; для открытого файла — обычная запись. На время работы кнопка показывает «Шифрование…».</td></tr>
             <tr><td>Зашифровать (в редакторе)</td><td>Появляется для открытого файла: создаёт SOPS-версию с получателями из <code>.sops.yaml</code> или серверного ключа.</td></tr>
             <tr><td>Резервные копии</td><td>Список и скачивание зашифрованных копий.</td></tr>
-            <tr><td>Git-панель</td><td>Ветка, состояние, последний коммит, коммит, pull.</td></tr>
+            <tr><td>Ключи</td><td>Для зашифрованного файла: пересчитать получателей по <code>.sops.yaml</code> (<code>sops updatekeys</code>) или перевыпустить ключ данных (<code>sops rotate</code>) — с резервной копией и проверкой.</td></tr>
+            <tr><td>Git-панель</td><td>Ветка, состояние, последний коммит, коммит, pull, «Дифф с HEAD» — расшифрованное сравнение с последним коммитом.</td></tr>
             <tr><td>Локальный файл</td><td>Скачать результат / записать в исходный файл.</td></tr>
             <tr><td>? в шапке</td><td>Эта справка, открывается в новой вкладке.</td></tr>
           </tbody>
@@ -244,7 +272,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
       </section>
 
       <section class="doc-section" id="troubleshooting">
-        <h2>8. Типичные проблемы</h2>
+        <h2>11. Типичные проблемы</h2>
         <table class="doc-table">
           <thead><tr><th>Симптом</th><th>Причина и решение</th></tr></thead>
           <tbody>
@@ -264,7 +292,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
       </section>
 
       <section class="doc-section" id="limits">
-        <h2>9. Ограничения</h2>
+        <h2>12. Ограничения</h2>
         <ul>
           <li>Форматы: YAML, JSON, dotenv, INI. Бинарные SOPS-файлы (архивы, произвольные данные) не поддерживаются.</li>
           <li>Получатели и KMS-политика не меняются: для ротации используйте <code>sops updatekeys</code>/<code>rotate</code>.</li>
@@ -275,12 +303,12 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
       </section>
 
       <section class="doc-section" id="api">
-        <h2>10. API (для автоматизации)</h2>
+        <h2>13. API (для автоматизации)</h2>
         <table class="doc-table">
           <thead><tr><th>Метод и путь</th><th>Назначение</th></tr></thead>
           <tbody>
             <tr><td><code>GET /api/health</code></td><td>Состояние и версия sops.</td></tr>
-            <tr><td><code>GET /api/status</code></td><td>Корни, auth, источник ключа, лимиты.</td></tr>
+            <tr><td><code>GET /api/status</code></td><td>Корни, режим auth и пользователь, источник ключа, лимиты.</td></tr>
             <tr><td><code>GET /api/browse?path=</code></td><td>Листинг каталога.</td></tr>
             <tr><td><code>GET /api/search?q=&amp;path=</code></td><td>Поиск файлов по имени.</td></tr>
             <tr><td><code>GET /api/file?path=</code></td><td>Расшифровать и открыть.</td></tr>
@@ -292,6 +320,8 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
             <tr><td><code>GET /api/backups?path=</code>, <code>GET /api/backups/{id}?path=</code></td><td>Список и скачивание резервных копий.</td></tr>
             <tr><td><code>POST/DELETE /api/session/key</code></td><td>Задать/забыть age-ключ вкладки.</td></tr>
             <tr><td><code>GET /api/git?path=</code>, <code>POST /api/git/commit|push|pull|clone</code></td><td>Git-операции.</td></tr>
+            <tr><td><code>GET /api/git/diff?path=&amp;op=</code></td><td>Расшифрованный файл и его версия из <code>HEAD</code> для сравнения рядом.</td></tr>
+            <tr><td><code>POST /api/keys/rotate</code></td><td>Ротация ключей (JSON: path, mode = <code>updatekeys</code> | <code>rotate</code>). Долгая операция: поддержите <code>op=</code> и опрашивайте <code>/api/ops/{id}</code>.</td></tr>
           </tbody>
         </table>
         <p>Все изменяющие запросы требуют заголовок <code>X-SOPS-Editor: 1</code>; при включённом Basic auth — стандартную авторизацию.</p>

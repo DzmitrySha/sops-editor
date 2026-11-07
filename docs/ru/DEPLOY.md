@@ -75,6 +75,49 @@ curl -fsS http://127.0.0.1:8787/api/health
 - Uvicorn запускается с `--proxy-headers --forwarded-allow-ips=*`; доверяйте только своей сети/Traefik.
 - Basic auth проверяется приложением; Traefik можно дополнительно закрыть IP allowlist.
 
+### Аутентификация
+
+`SOPS_EDITOR_AUTH_MODE` выбирает способ аутентификации запроса.
+
+| Режим | Что проверяется | Когда использовать |
+|---|---|---|
+| `basic` (по умолчанию) | `Authorization: Basic`, пользователь `SOPS_EDITOR_AUTH_USER`, пароль `SOPS_EDITOR_AUTH_PASSWORD` | прямой доступ, небольшая команда |
+| `header` | заголовок `SOPS_EDITOR_AUTH_HEADER` (по умолчанию `X-Forwarded-User`) непустой | OIDC-прокси (oauth2-proxy, Authentik, Traefik forward-auth) уже аутентифицировал пользователя |
+| `none` | ничего (в остальных режимах публичен только `/api/health`) | демо на loopback |
+
+```dotenv
+SOPS_EDITOR_AUTH_MODE=header
+SOPS_EDITOR_AUTH_HEADER=X-Forwarded-User
+SOPS_EDITOR_AUTH_TRUSTED_PROXIES=172.18.0.0/16
+```
+
+`SOPS_EDITOR_AUTH_TRUSTED_PROXIES` — список IP/CIDR через запятую. Если задан,
+заголовок принимается только когда TCP-peer входит в эти сети; если пуст —
+заголовок принимается с любого адреса, и контейнер пишет предупреждение при
+старте. В режиме `header` ответ `401` идёт **без** `WWW-Authenticate`, поэтому
+браузер не показывает окно пароля.
+
+**Нельзя выставлять режим `header` напрямую.** Заголовок подделывается тривиально:
+порт только на loopback или внутренней сети, доступ — только через прокси.
+
+Пример oauth2-proxy + Traefik:
+
+```yaml
+ai-sops-edit:
+  labels:
+    - traefik.http.routers.ai-sops-edit.middlewares=oauth2-proxy@docker
+  environment:
+    SOPS_EDITOR_AUTH_MODE: header
+    SOPS_EDITOR_AUTH_TRUSTED_PROXIES: 172.18.0.0/16
+```
+
+Проверка без браузера:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8787/api/status              # 401
+curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status | grep alice      # user alice
+```
+
 ## Права и контейнер
 
 - Контейнер работает от root внутри namespaces, `read_only: true`, `cap_drop: ALL`, `no-new-privileges`; запись только в `/data`, `/workspace`, `/tmp` (tmpfs).
