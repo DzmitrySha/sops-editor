@@ -424,6 +424,7 @@
     "Изменений нет — документ совпадает с открытой версией.": "No changes — the document matches the opened version.",
     "строк": "lines",
     "Файл не входит в git-репозиторий.": "The file is not inside a git repository.",
+    "age1…\nage1… (необязательно)": "age1…\nage1… (optional)",
   };
 
   // ------------------------------------------------------- dynamic patterns
@@ -458,6 +459,8 @@
 
   function translate(text) {
     if (!text) return text;
+    const raw = EN[text];
+    if (raw) return raw;
     const trimmed = text.replace(/\s+/g, " ").trim();
     if (!trimmed) return text;
     const exact = EN[trimmed];
@@ -482,11 +485,19 @@
   const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "CODE", "PRE", "TEXTAREA", "INPUT", "SELECT"]);
   const ATTRS = ["placeholder", "title", "aria-label", "alt"];
 
+  const SKIP_CONTAINERS = ".CodeMirror, #secretsList, .diff-cols, .lang-switch";
+
   function skip(node) {
     const element = node.nodeType === 1 ? node : node.parentElement;
     if (!element) return true;
     if (SKIP_TAGS.has(element.tagName)) return true;
-    return Boolean(element.closest(".CodeMirror, #secretsList, .diff-cols, .lang-switch"));
+    return Boolean(element.closest(SKIP_CONTAINERS));
+  }
+
+  // Attributes are safe to translate on INPUT/TEXTAREA (placeholders), so only
+  // containers with opaque user content are excluded.
+  function skipAttr(element) {
+    return Boolean(element.closest(SKIP_CONTAINERS));
   }
 
   function translateElement(root) {
@@ -498,7 +509,7 @@
       return;
     }
     if (root.nodeType !== 1) return;
-    if (!skip(root)) {
+    if (!skipAttr(root)) {
       for (const attr of ATTRS) {
         const value = root.getAttribute(attr);
         if (value) {
@@ -518,7 +529,7 @@
     }
     if (root.querySelectorAll) {
       root.querySelectorAll("[placeholder],[title],[aria-label],[alt]").forEach((el) => {
-        if (skip(el)) return;
+        if (skipAttr(el)) return;
         for (const attr of ATTRS) {
           const value = el.getAttribute(attr);
           if (value) {
@@ -545,7 +556,7 @@
         }
         if (mutation.type === "attributes" && mutation.target.getAttribute) {
           const element = mutation.target;
-          if (!skip(element)) {
+          if (!skipAttr(element)) {
             const attr = mutation.attributeName;
             const value = element.getAttribute(attr);
             if (value) {
