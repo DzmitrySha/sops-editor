@@ -1,0 +1,7 @@
+host: db.internal
+port: 5432
+user: app
+password: s3cr3t-db
+replica:
+  host: db-replica.internal
+  password: s3cr3t-db-replica

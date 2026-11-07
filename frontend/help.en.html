@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Documentation — SOPS Editor</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <!--INLINE_STYLES-->
+</head>
+<body>
+  <div class="doc-page">
+    <div class="doc-wrap">
+      <div class="doc-head">
+        <div>
+          <span class="section-kicker">Help</span>
+          <h1 class="doc-title">SOPS Editor — what to do</h1>
+        </div>
+        <div class="row-gap">
+          <span class="doc-lang"><a href="/help.html?lang=ru">RU</a><a href="/help.html?lang=en" class="active">EN</a></span>
+          <a class="btn ghost" href="/" rel="noopener">← Back to editor</a>
+        </div>
+      </div>
+      <p class="doc-lede">The tool decrypts a SOPS file in memory, lets you edit secrets and saves it back encrypted with the same recipients and rules. Below: connecting sops, keys, every workflow and the usual problems.</p>
+
+      <nav class="doc-nav">
+        <a href="#sops">Connect sops</a>
+        <a href="#keys">Keys</a>
+        <a href="#keyless">No key</a>
+        <a href="#local">File from computer</a>
+        <a href="#encrypt">Encrypt from scratch</a>
+        <a href="#server">Server file</a>
+        <a href="#git">Git</a>
+        <a href="#save">How saving works</a>
+        <a href="#ui">All features</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+        <a href="#limits">Limits</a>
+        <a href="#api">API</a>
+      </nav>
+
+      <section class="doc-section" id="sops">
+        <h2>1. Connecting SOPS</h2>
+        <p>The app needs two executables: <code>sops</code> (encryption/decryption) and, preferably, <code>age-keygen</code> (key validation). Plus the private key that the file was encrypted for.</p>
+
+        <h3>Option A. Docker (recommended)</h3>
+        <p>The image already ships <code>sops 3.13.3</code> and <code>age 1.3.2</code> — nothing to install. Check the badge in the header: “sops …” shows the version, “sops unavailable” shows an error.</p>
+<pre><code># Windows: start-windows.cmd   (or the shortcut from windows\install-shortcut.ps1)
+# Linux:
+docker compose --env-file docker/.env --env-file docker/.env.secrets up -d --build
+curl -s http://localhost:8787/api/health      # {"status":"ok","sops":"sops 3.13.3"}</code></pre>
+
+        <h3>Option B. Without Docker (Windows, local development)</h3>
+        <ol>
+          <li>Put <code>sops.exe</code> and <code>age\age-keygen.exe</code> into the project’s <code>.tools\</code> directory (or add them to <code>PATH</code>).</li>
+          <li>Create a virtualenv and install dependencies: <code>.venv\Scripts\pip install -e "backend[test]"</code>.</li>
+          <li>Start the server with roots and the key:</li>
+        </ol>
+<pre><code>set SOPS_EDITOR_ROOTS=D:\repo|D:\tmp\repos
+set SOPS_EDITOR_STORAGE=D:\sops-data
+set SOPS_AGE_KEY_FILE=D:\keys\age.txt
+set SOPS_EDITOR_SOPS_BIN=D:\project\.tools\sops.exe
+set SOPS_EDITOR_AGE_KEYGEN_BIN=D:\project\.tools\age\age-keygen.exe
+cd backend
+..\.venv\Scripts\python -m uvicorn app.main:create_app --factory --port 8787</code></pre>
+
+        <h3>Option C. System-wide install</h3>
+<pre><code># Windows (winget / scoop / choco)
+winget install --id GetsOps.SOPS
+# Linux (deb/rpm from the releases page), or:
+curl -fsSL -o /usr/local/bin/sops https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.linux.amd64
+chmod +x /usr/local/bin/sops
+sops --version</code></pre>
+        <div class="doc-note"><p>If <code>sops</code> is not in <code>PATH</code>, set the full path via <code>SOPS_EDITOR_SOPS_BIN</code> (and <code>SOPS_EDITOR_AGE_KEYGEN_BIN</code> for age-keygen).</p></div>
+
+        <h3>Encryption rules (.sops.yaml)</h3>
+        <p>SOPS takes recipients from <code>.sops.yaml</code> at the repository root or from the file’s own metadata. The app <strong>never changes recipients</strong>: saving goes through <code>sops edit</code>, so keys, MAC and <code>encrypted_regex</code> stay as they were.</p>
+<pre><code># .sops.yaml
+creation_rules:
+  - path_regex: .*\.enc\.yaml$
+    age: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p</code></pre>
+
+        <h3>Encrypt an existing file</h3>
+<pre><code>sops --encrypt --in-place secrets.yaml          # uses .sops.yaml
+sops --encrypt --age age1... --in-place secrets.yaml
+sops --decrypt secrets.yaml                     # verify the key fits
+sops filestatus secrets.yaml                    # {"encrypted": true, ...}</code></pre>
+        <div class="doc-note warn"><p>Plain files can be opened in the editor too; the “Encrypt” button creates the SOPS version. Encrypted files with unusual names (e.g. <code>.env_enc.test</code>) are detected by their content.</p></div>
+      </section>
+
+      <section class="doc-section" id="keys">
+        <h2>2. Keys: which one is used</h2>
+        <p>Key selection, from highest to lowest priority:</p>
+        <table class="doc-table">
+          <thead><tr><th>Source</th><th>How to set</th><th>Scope</th></tr></thead>
+          <tbody>
+            <tr><td>Tab key</td><td>“Key” button → paste <code>AGE-SECRET-KEY-1…</code></td><td>Process memory, TTL 8 h, tab cookie</td></tr>
+            <tr><td>Server file</td><td><code>keys/age.txt</code> → <code>/keys/age.txt</code>, or <code>SOPS_AGE_KEY_FILE</code></td><td>All users of the instance</td></tr>
+            <tr><td>Default key</td><td><code>~/.config/sops/age/keys.txt</code></td><td>Container user</td></tr>
+            <tr><td>Environment</td><td><code>SOPS_AGE_KEY</code>, PGP/KMS/Vault variables</td><td>Server process</td></tr>
+          </tbody>
+        </table>
+        <p>Generate a new pair:</p>
+<pre><code>age-keygen -o keys/age.txt
+grep 'public key' keys/age.txt          # age1… — add it to .sops.yaml
+# private key — only in keys/age.txt (mounted read-only) or in env</code></pre>
+        <p>In Docker the keys directory is mounted read-only: <code>SOPS_EDITOR_KEYS=./keys</code>. If the file is missing, the app starts without a server key and offers to enter one in the UI.</p>
+        <div class="doc-note"><p>A key entered in the UI lives only in process memory and is never written to disk or logs. “Forget key” removes it immediately. The tab key takes precedence over the server key: while it is set, the server key is not used.</p></div>
+      </section>
+
+      <section class="doc-section" id="keyless">
+        <h2>2.1. Files exist, no key</h2>
+        <div class="doc-note warn"><p>This is not a bug. A SOPS file contains only <em>public</em> recipients; the private key is not inside. Without the private key of at least one recipient decryption is impossible — it cannot be brute-forced, that is the point of encryption.</p></div>
+
+        <h3>Step 1. Find out which key is needed</h3>
+        <ul>
+          <li>Open the file in the app — the “Key” window lists <code>age: age1…</code>, <code>PGP: fingerprint</code> or the provider (KMS/Vault).</li>
+          <li>In a terminal: <code>sops filestatus file</code> or simply <code>sops -d file</code> — the error names the recipients.</li>
+          <li>The metadata is in the file’s own <code>sops:</code> section — it is not secret.</li>
+        </ul>
+
+        <h3>Step 2. Find the recipient’s private key</h3>
+        <table class="doc-table">
+          <thead><tr><th>Type</th><th>Where to look</th></tr></thead>
+          <tbody>
+            <tr><td>age</td><td><code>keys/age.txt</code>, <code>SOPS_AGE_KEY</code>, <code>SOPS_AGE_KEY_FILE</code>, <code>~/.config/sops/age/keys.txt</code>, <code>*.agekey</code>, password manager; the machine that encrypted the file; CI/CD secrets; the colleague who granted access.</td></tr>
+            <tr><td>PGP</td><td>Secret key in GnuPG: <code>gpg --list-secret-keys --keyid-format long</code>. Must be on the server/container (gpg-agent); the UI “Key” field accepts age keys only.</td></tr>
+            <tr><td>KMS / Vault</td><td>No private key: the server process needs cloud permissions (IAM role, Vault token).</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Step 3. Verify the key before uploading</h3>
+<pre><code>age -d -i keys/age.txt secrets.enc.yaml          # age
+SOPS_AGE_KEY_FILE=keys/age.txt sops -d secrets.enc.yaml
+gpg --decrypt secrets.enc.yaml                    # PGP, if the key is in the keyring</code></pre>
+        <p>If the command prints plaintext, the same key file works for the app: put it in <code>keys/age.txt</code>, set <code>SOPS_AGE_KEY_FILE</code> or paste the key into the “Key” window.</p>
+
+        <h3>If the key is gone</h3>
+        <ul>
+          <li>Recovering a ciphertext without the recipient’s key is impossible — neither with this tool, nor <code>sops</code>, nor <code>updatekeys</code>/<code>rotate</code>.</li>
+          <li>Look for plaintext sources: old branches/tags, backups, another person/machine, CI artifacts — and encrypt again with a new key.</li>
+          <li>A new key added to <code>keys/age.txt</code> or the UI changes nothing: recipients are recorded in the file. To add a recipient you need access with an <em>old</em> key: add it to <code>.sops.yaml</code> and run <code>sops updatekeys file</code>.</li>
+          <li>Keep a backup of the key: <code>age-keygen -o</code> once, at least two copies.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="local">
+        <h2>3. File from your computer (local git clone)</h2>
+        <ol>
+          <li>Open the <strong>“From computer”</strong> tab.</li>
+          <li>Press <strong>“Choose file”</strong> (standard browser dialog — always works) or drag a file into the drop zone. A status line appears under the button: name, size, stage (“Uploading…” / error / “opened”). An <strong>unencrypted</strong> YAML/JSON/dotenv/INI file also opens in the editor; the <strong>“Encrypt”</strong> button in the editor creates the SOPS version.</li>
+          <li>If there is no server key, the “Key” window opens — paste your <code>AGE-SECRET-KEY-1…</code> (or load a <code>.txt</code> with the key). The file opens automatically afterwards.</li>
+          <li>Edit the secrets and press <strong>“Save”</strong> (<kbd>Ctrl</kbd>+<kbd>S</kbd>). The server encrypts and verifies the result.</li>
+          <li>Take the result: <strong>“Download encrypted”</strong> — the browser saves the file under its original name; <strong>“Write to source file”</strong> — in Chrome/Edge writes the ciphertext straight into the chosen file and asks only for overwrite confirmation (no second location prompt).</li>
+        </ol>
+        <div class="doc-note"><p>Direct writing requires the browser to remember the file. The <strong>“Allow overwriting the file…”</strong> button in the left panel asks you to pick the same file once — the handle is kept until the tab is reloaded; after that “Write to source file” only asks for confirmation. If the browser does not support the API, only “Download encrypted” and manual replacement are available.</p></div>
+        <p>What happens on the server: the uploaded file is stored in <code>/data/uploads/&lt;tab id&gt;/&lt;random dir&gt;/name</code>, decrypted in memory, and after saving downloaded back already encrypted. Directories older than 7 days are removed automatically.</p>
+        <p>Browser limitation: the full local path is not exposed, so the tool works with the chosen file, not the whole folder. For a repository, mount it into <code>/workspace</code>.</p>
+      </section>
+
+      <section class="doc-section" id="server">
+        <h2>4. File on the server</h2>
+        <ul>
+          <li><strong>Path manually:</strong> <code>/workspace/secrets/app.enc.yaml</code> — a path inside the container.</li>
+          <li><strong>Browse:</strong> “Browse” opens the tree of allowed directories; double-click to enter/open, “Search the tree” to find by name.</li>
+          <li><strong>From git:</strong> the “From git” tab → URL and branch → “Clone to /data/repos”. The directory browser opens right after cloning.</li>
+        </ul>
+        <p>Allowed directories are set by <code>SOPS_EDITOR_ROOTS</code> (separated by <code>|</code>) and listed on the start screen; clicking one opens the browser.</p>
+      </section>
+
+      <section class="doc-section" id="encrypt">
+        <h2>5. Encrypt a file from scratch</h2>
+        <p>Open a plain YAML/JSON/dotenv/INI file (server, git or computer) — it opens in the editor. Press <strong>“Encrypt”</strong> in the editor toolbar: the server runs <code>sops encrypt</code> and creates a sibling file (<code>secret.yaml</code> → <code>secret.enc.yaml</code>); the original stays untouched. The encrypted file opens right away.</p>
+        <h3>Recipients</h3>
+        <ul>
+          <li><strong>Empty</strong> — use the nearest <code>.sops.yaml</code> rule; if there is no rule, the server (or session) key.</li>
+          <li><strong>Custom</strong> — one or more public <code>age1…</code> keys, comma/newline separated. No private key is needed: encryption uses public recipients only.</li>
+          <li>The private key from the “Key” window becomes the default recipient automatically — the file opens in the editor immediately.</li>
+        </ul>
+        <div class="doc-note"><p>The file is encrypted on the server and only ciphertext remains: plaintext is removed from the uploaded file right after encryption. The source file on your computer is unchanged: take the result with “Download encrypted” / “Write to source file”.</p></div>
+        <p>Terminal equivalent:</p>
+<pre><code>sops --encrypt --age age1… --input-type yaml --output-type yaml secret.yaml &gt; secret.enc.yaml
+# or with repository rules:
+sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.yaml</code></pre>
+      </section>
+
+      <section class="doc-section" id="git">
+        <h2>6. Git</h2>
+        <table class="doc-table">
+          <thead><tr><th>Button</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td>Commit</td><td><code>git add -- file</code> + <code>git commit -- file</code>; only the open file is committed. The “push” checkbox pushes after the commit.</td></tr>
+            <tr><td>↻ (pull)</td><td><code>git pull --ff-only</code>, only with a clean worktree. The file is reloaded after the pull.</td></tr>
+            <tr><td>From git</td><td><code>git clone</code> into <code>/data/repos/&lt;name&gt;</code>.</td></tr>
+          </tbody>
+        </table>
+        <p>For private HTTPS repositories set <code>SOPS_EDITOR_GIT_TOKEN</code> (GitLab: <code>oauth2</code>, GitHub: <code>x-access-token</code>); the token never comes from the UI. For SSH mount a key or an agent. Clone hosts can be restricted with <code>SOPS_EDITOR_GIT_ALLOWED_HOSTS</code>.</p>
+      </section>
+
+      <section class="doc-section" id="save">
+        <h2>7. How saving works</h2>
+        <ol>
+          <li>The server compares the SHA-256 of the submitted ciphertext with the current file — protection against overwriting someone else’s edit (<code>409 conflict</code>).</li>
+          <li>Creates a ciphertext backup in <code>/data/backups/&lt;hash&gt;/</code> (10 per file by default).</li>
+          <li>Writes the plaintext into a temporary <code>0600</code> file in a private directory and runs <code>sops edit</code> with a one-shot “editor”; SOPS re-encrypts with the original metadata and updates the MAC.</li>
+          <li>Decrypts the result again and compares the data with what was submitted; on mismatch the original ciphertext is restored atomically.</li>
+          <li>The temporary plaintext is removed in <code>finally</code>.</li>
+        </ol>
+        <p>The file on disk is either the old or the new ciphertext at any moment. Plaintext is never written to disk.</p>
+      </section>
+
+      <section class="doc-section" id="ui">
+        <h2>8. All UI features</h2>
+        <table class="doc-table">
+          <thead><tr><th>Element</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>Server file</td><td>Path + “Browse” + “Open”; links to the allowed roots. “Encrypt…” in the browser for plain files.</td></tr>
+            <tr><td>From git</td><td>Clone a repository and jump to the file browser.</td></tr>
+            <tr><td>From computer</td><td>Upload a file (encrypted or plain), loading status, hand the result back.</td></tr>
+            <tr><td>Key</td><td>Key source, paste/load a key, “Forget key”.</td></tr>
+            <tr><td>Recent</td><td>The last 8 opened paths (localStorage, “Clear”).</td></tr>
+            <tr><td>Theme</td><td>Dark/light, remembered; the help page follows it.</td></tr>
+            <tr><td>Language</td><td>RU/EN switch in the header; the help page follows it.</td></tr>
+            <tr><td>Editor</td><td>CodeMirror: YAML/JSON/dotenv/INI highlighting, <kbd>Ctrl</kbd>+<kbd>F</kbd> search, folding, live syntax check.</td></tr>
+            <tr><td>Secrets</td><td>Key tree, filter, jump to line, copy a value, show/hide values.</td></tr>
+            <tr><td>Changes</td><td>Diff between the opened version and the current text.</td></tr>
+            <tr><td>Save</td><td>SOPS files are encrypted with <code>sops edit</code>; plain files are written as is. The button shows “Encrypting…” while it works.</td></tr>
+            <tr><td>Encrypt (in editor)</td><td>Appears for a plain file: creates the SOPS version with recipients from <code>.sops.yaml</code> or the server key.</td></tr>
+            <tr><td>Backups</td><td>List and download encrypted copies.</td></tr>
+            <tr><td>Git panel</td><td>Branch, state, last commit, commit, pull.</td></tr>
+            <tr><td>Local file</td><td>Download the result / write it to the source file.</td></tr>
+            <tr><td>? in the header</td><td>This documentation, opens in a new tab.</td></tr>
+          </tbody>
+        </table>
+        <p><kbd>Ctrl</kbd>+<kbd>S</kbd> — save, <kbd>Esc</kbd> — close a window, <kbd>Ctrl</kbd>+<kbd>F</kbd> — search in the editor.</p>
+      </section>
+
+      <section class="doc-section" id="troubleshooting">
+        <h2>9. Troubleshooting</h2>
+        <table class="doc-table">
+          <thead><tr><th>Symptom</th><th>Cause and fix</th></tr></thead>
+          <tbody>
+            <tr><td>Chose a file — nothing happens</td><td>The dialog was closed or the file was not selected. The status line under the button always shows the reason now. Use “Choose file” (standard dialog, always works) or drag the file.</td></tr>
+            <tr><td>“The file is not SOPS-encrypted”</td><td>Plain files open in the editor now; press “Encrypt” to create the SOPS version. Encrypted files with unusual names (e.g. <code>.env_enc.test</code>) are detected by content.</td></tr>
+            <tr><td>“Private key” window after choosing</td><td>The server cannot decrypt the file: no matching key. Paste <code>AGE-SECRET-KEY-1…</code>, put <code>keys/age.txt</code> in place or check <code>SOPS_AGE_KEY_FILE</code>.</td></tr>
+            <tr><td>“The key does not match this file”</td><td>The file is encrypted for another recipient. Check <code>sops -d</code> with this key and <code>.sops.yaml</code>.</td></tr>
+            <tr><td>“sops unavailable” in the header</td><td>The container lacks the binary (wrong image) or <code>SOPS_EDITOR_SOPS_BIN</code> is wrong. Check <code>/api/health</code>.</td></tr>
+            <tr><td>Opening or saving takes long</td><td>The operation runs on the server: the progress window shows a spinner, elapsed time and the step list (path → read → SOPS metadata → <code>sops decrypt</code> → format → git). If the time runs but steps do not move, the delay is the network/proxy between the browser and the server — wait for the reply, do not close the tab. Excluding <code>localhost</code>/<code>127.0.0.1</code> from a filtering proxy (e.g. AdGuard) removes the first-request stall.</td></tr>
+            <tr><td>409 “The file changed”</td><td>The file was overwritten by another process/person. Press “Reload” — editor changes will be lost (copy them first if needed).</td></tr>
+            <tr><td>413 “File is too large”</td><td>The <code>SOPS_EDITOR_MAX_FILE_BYTES</code> limit (5 MiB by default). Raise it.</td></tr>
+            <tr><td>“Could not write the file”</td><td>The browser denied write permission or the file is unavailable. Use “Download encrypted” and replace the file manually.</td></tr>
+            <tr><td>The file disappeared from “Download”</td><td>Upload directories older than 7 days are removed. Upload the file from your computer again.</td></tr>
+            <tr><td>Push fails</td><td>No remote or credentials: set <code>SOPS_EDITOR_GIT_TOKEN</code> or mount an SSH key.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="doc-section" id="limits">
+        <h2>10. Limits</h2>
+        <ul>
+          <li>Formats: YAML, JSON, dotenv, INI. Binary SOPS files (archives, arbitrary data) are not supported.</li>
+          <li>Recipients and KMS policy are not changed: use <code>sops updatekeys</code>/<code>rotate</code> for rotation.</li>
+          <li>No multi-user model: Basic auth plus one server key or per-tab keys in memory.</li>
+          <li>Plaintext passes through the server (in memory) — open the tool over HTTPS or on localhost.</li>
+          <li>Building the Docker image needs internet (sops/age/pip).</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="api">
+        <h2>11. API (for automation)</h2>
+        <table class="doc-table">
+          <thead><tr><th>Method and path</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /api/health</code></td><td>Status and sops version.</td></tr>
+            <tr><td><code>GET /api/status</code></td><td>Roots, auth, key source, limits.</td></tr>
+            <tr><td><code>GET /api/browse?path=</code></td><td>Directory listing.</td></tr>
+            <tr><td><code>GET /api/search?q=&amp;path=</code></td><td>Search files by name.</td></tr>
+            <tr><td><code>GET /api/file?path=</code></td><td>Decrypt and open (plain files too).</td></tr>
+            <tr><td><code>POST /api/file</code></td><td>Encrypt/save (JSON: path, content, format, expected_sha256).</td></tr>
+            <tr><td><code>GET/POST /api/file/job?op=</code></td><td>Same as above with a progress operation id.</td></tr>
+            <tr><td><code>GET /api/ops/{id}</code></td><td>Operation status, events and result.</td></tr>
+            <tr><td><code>POST /api/upload?name=&amp;op=</code></td><td>Upload a file from the computer (raw body); encrypted or plain.</td></tr>
+            <tr><td><code>POST /api/encrypt/upload?name=&amp;recipients=</code></td><td>Encrypt a plain uploaded file (raw body).</td></tr>
+            <tr><td><code>POST /api/encrypt</code></td><td>Encrypt a plain server file (JSON: path, recipients).</td></tr>
+            <tr><td><code>GET /api/download?path=</code></td><td>Download an uploaded file.</td></tr>
+            <tr><td><code>GET /api/backups?path=</code>, <code>GET /api/backups/{id}?path=</code></td><td>List and download backups.</td></tr>
+            <tr><td><code>POST/DELETE /api/session/key</code></td><td>Set/forget the tab age key.</td></tr>
+            <tr><td><code>GET /api/git?path=</code>, <code>POST /api/git/commit|push|pull|clone</code></td><td>Git operations.</td></tr>
+          </tbody>
+        </table>
+        <p>All mutating requests require the <code>X-SOPS-Editor: 1</code> header; with Basic auth enabled, standard authorization too.</p>
+      </section>
+
+      <p class="muted small">Deployment details — <code>docs/DEPLOY.md</code>, security policy — <code>docs/SECURITY.md</code>.</p>
+    </div>
+  </div>
+</body>
+</html>

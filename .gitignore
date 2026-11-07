@@ -1,0 +1,43 @@
+# --- secrets: never commit real values -------------------------------------
+.env
+.env.local
+docker/.env
+docker/.env.secrets
+keys/*
+!keys/README.md
+!keys/age.example.txt
+
+# --- runtime data ----------------------------------------------------------
+workspace/*
+!workspace/examples/
+storage/
+*.log
+logs/
+backups/
+
+# --- python ----------------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- tooling ---------------------------------------------------------------
+.tools/
+node_modules/
+*.tsbuildinfo
+
+# --- os / editor -----------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp

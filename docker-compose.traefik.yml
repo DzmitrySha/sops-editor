@@ -1,0 +1,34 @@
+# Server overlay: publish through a shared Traefik.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
+#     --env-file docker/.env --env-file docker/.env.secrets up -d --build
+#
+# docker/.env:
+#   # dev / work:
+#   SOPS_EDITOR_FQDN=sops-dev.example.com
+#   # prod (k8s/HTTPRoute, без -dev):
+#   # SOPS_EDITOR_FQDN=sops.example.com
+#   SOPS_EDITOR_TRUST_PROXY=true
+#   SOPS_EDITOR_COOKIE_SECURE=true
+#   SOPS_EDITOR_AUTH_PASSWORD=<strong secret>   # in .env.secrets
+#
+# Host port stays bound to 127.0.0.1 (see base compose); Traefik reaches the
+# container over the shared network on port 8080.
+
+services:
+  ai-sops-edit:
+    networks:
+      - default
+      - traefik_proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik_proxy
+      - traefik.http.routers.ai-sops-edit.rule=Host(`${SOPS_EDITOR_FQDN:-sops-dev.example.com}`)
+      - traefik.http.routers.ai-sops-edit.entrypoints=websecure
+      - traefik.http.routers.ai-sops-edit.tls=true
+      - traefik.http.services.ai-sops-edit.loadbalancer.server.port=8080
+
+networks:
+  traefik_proxy:
+    external: true
+    name: traefik_proxy

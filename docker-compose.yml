@@ -1,0 +1,60 @@
+# Local / work Compose.
+#
+#   cp docker/.env.example docker/.env
+#   cp docker/.env.secrets.example docker/.env.secrets
+#   edit docker/.env: SOPS_EDITOR_WORKSPACE=/path/to/repo
+#   docker compose --env-file docker/.env --env-file docker/.env.secrets up -d --build
+#
+# Server + shared Traefik:
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
+#     --env-file docker/.env --env-file docker/.env.secrets up -d --build
+
+name: ai-sops-edit
+
+networks:
+  default:
+    name: ai-sops-edit_default
+
+services:
+  ai-sops-edit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${SOPS_EDITOR_IMAGE:-ai-sops-edit:local}
+    container_name: ai-sops-edit
+    restart: unless-stopped
+    env_file:
+      - path: docker/.env
+        required: false
+      - path: docker/.env.secrets
+        required: false
+    environment:
+      SOPS_EDITOR_ROOTS: /workspace|/data/repos
+      SOPS_EDITOR_STORAGE: /data
+      SOPS_EDITOR_FRONTEND_DIR: /app/frontend
+      SOPS_AGE_KEY_FILE: /keys/age.txt
+    ports:
+      - "${SOPS_EDITOR_BIND:-127.0.0.1}:${SOPS_EDITOR_PORT:-8787}:8080"
+    volumes:
+      - "${SOPS_EDITOR_WORKSPACE:-./workspace}:/workspace"
+      - "${SOPS_EDITOR_KEYS:-./keys}:/keys:ro"
+      - "${SOPS_EDITOR_DATA:-./storage}:/data"
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=5)",
+        ]
+      interval: 15s
+      timeout: 6s
+      retries: 6
+      start_period: 20s

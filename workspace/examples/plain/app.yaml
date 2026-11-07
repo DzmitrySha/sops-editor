@@ -1,0 +1,13 @@
+# Демо-секрет приложения (k8s-подобный). Поле metadata остаётся открытым,
+# шифруются только data/stringData (encrypted_regex из .sops.yaml).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: demo-app
+  namespace: sops-editor
+type: Opaque
+stringData:
+  username: demo-admin
+  password: hunter2
+  database_url: postgres://demo:hunter2@db:5432/app
+  feature_flags: '{"beta": true, "max_users": 25}'

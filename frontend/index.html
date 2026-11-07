@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>SOPS Editor</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="prefetch" href="/help.html" as="document">
+  <link rel="stylesheet" href="/vendor/codemirror/codemirror.min.css">
+  <link rel="stylesheet" href="/vendor/codemirror/addon/dialog/dialog.min.css">
+  <link rel="stylesheet" href="/vendor/codemirror/addon/fold/foldgutter.min.css">
+  <link rel="stylesheet" href="/styles.css?v=16">
+</head>
+<body>
+  <svg class="svg-defs" aria-hidden="true">
+    <symbol id="i-lock" viewBox="0 0 24 24"><path d="M6 10V8a6 6 0 0 1 12 0v2h1a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9a1 1 0 0 1 1-1h1Zm2 0h8V8a4 4 0 0 0-8 0v2Zm4 4a2 2 0 0 0-1 3.73V20h2v-2.27A2 2 0 0 0 12 14Z"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm7 2v4h4"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><path d="M14 2a8 8 0 0 1 7.75 10H22l-1 2h-1v2h-2v2h-2v2h-3v-3h-2.17A8 8 0 1 1 14 2Zm0 2a6 6 0 1 0 3.32 11H16v3h1v-2h2v-2h2v-2h1v-1a6 6 0 0 0-8-7Zm-1.5 5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M4 3h13l3 3v15H4V3Zm3 2v5h9V5H7Zm-1 9v6h12v-6H6Z"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m10 5-7 7 7 7 1.4-1.4L6.8 13H21v-2H6.8l4.6-4.6L10 5Z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 1 7.75 6H17a6 6 0 1 0-1.7 5.4l1.4 1.4A8 8 0 1 1 12 4Zm6 0h4v4h-2V7.4l-3.3 3.3-1.4-1.4L18.6 6H18V4Z"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M12 5c5 0 9 4 10 7-1 3-5 7-10 7S3 15 2 12c1-3 5-7 10-7Zm0 2c-3.7 0-6.8 2.6-7.8 5 1 2.4 4.1 5 7.8 5s6.8-2.6 7.8-5c-1-2.4-4.1-5-7.8-5Zm0 1.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="m3.3 2 19 19-1.4 1.4-4.2-4.2A11 11 0 0 1 12 19C7 19 3 15 2 12a12 12 0 0 1 4.3-5.3L1.9 3.3 3.3 2Zm4.8 6.2A10 10 0 0 0 4.2 12c1 2.4 4.1 5 7.8 5 1.1 0 2.1-.3 3-.7l-1.7-1.7a3.5 3.5 0 0 1-4.9-4.9L8.1 8.2ZM12 5c5 0 9 4 10 7a12 12 0 0 1-2.3 3.4l-1.5-1.5A10 10 0 0 0 19.8 12c-1-2.4-4.1-5-7.8-5-.6 0-1.2.1-1.8.3L8.5 5.6C9.6 5.2 10.8 5 12 5Z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><path d="M8 2h10a2 2 0 0 1 2 2v12h-2V4H8V2ZM6 6h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Zm0 2v12h10V8H6Z"/></symbol>
+    <symbol id="i-git" viewBox="0 0 24 24"><path d="m12 2 10 10-10 10L2 12 12 2Zm0 3.8L5.8 12l6.2 6.2 6.2-6.2L12 5.8Z"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 1-8.5 6H1l4-5 4 5H6.2A7 7 0 1 0 12 5V3Zm-1 4h2v5.6l3.7 2.2-1 1.7-4.7-2.9V7Z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m5.6 4.2 14.2 14.2-1.4 1.4L4.2 5.6l1.4-1.4Z"/><path d="M19.8 4.2 5.6 18.4l1.4 1.4L21.2 5.6l-1.4-1.4Z"/></symbol>
+    <symbol id="i-diff" viewBox="0 0 24 24"><path d="M4 3h16v18H4V3Zm2 2v14h12V5H6Zm4 2h4v2h-4V7Zm0 4h7v2H10v-2Zm0 4h7v2H10v-2ZM7 7h1v8H7V7Z"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m8 5 7 7-7 7-1.4-1.4L12.2 12 6.6 6.4 8 5Z"/></symbol>
+  </svg>
+
+  <div class="app">
+    <header class="topbar">
+      <button class="brand" id="brandBtn" type="button" title="На главную">
+        <span class="brand-mark"><svg><use href="#i-lock"/></svg></span>
+        <span class="brand-name">SOPS<span>Editor</span></span>
+      </button>
+      <div class="pathbar" id="pathbar">
+        <button class="icon-btn" id="btnBack" type="button" title="К открытию файла"><svg><use href="#i-back"/></svg></button>
+        <div class="path-text" id="pathText"></div>
+        <span class="dirty-dot" id="dirtyDot" title="Есть несохранённые изменения"></span>
+      </div>
+      <div class="top-actions">
+        <span class="chip" id="authChip" hidden></span>
+        <span class="chip" id="keyChip" title="Источник ключа расшифровки"></span>
+        <a class="icon-btn help-btn" id="btnHelp" href="/help.html" target="_blank" rel="noopener" title="Документация: подключение sops, ключи, файлы с компьютера" aria-label="Документация">?</a>
+        <div class="lang-switch" role="group" aria-label="Language">
+          <button type="button" data-lang="ru">RU</button>
+          <button type="button" data-lang="en">EN</button>
+        </div>
+        <button class="icon-btn" id="btnTheme" type="button" title="Тема"><span id="themeGlyph">◐</span></button>
+        <button class="btn ghost" id="btnDiff" type="button" disabled><svg><use href="#i-diff"/></svg><span>Изменения</span></button>
+        <button class="btn ghost" id="btnSave" type="button" disabled><svg><use href="#i-save"/></svg><span>Сохранить</span><kbd>Ctrl S</kbd></button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="open-screen" id="openScreen">
+        <div class="open-hero">
+          <div class="hero-copy">
+            <p class="eyebrow">SOPS · age · git</p>
+            <h1>Секреты без ручной возни</h1>
+            <p class="lede">Откройте SOPS-файл из подключённого каталога или git-репозитория. Редактор расшифрует его в памяти, а сохранение зашифрует обратно с теми же получателями и правилами <code>.sops.yaml</code>.</p>
+            <div class="hero-badges">
+              <span class="pill" id="sopsVersion">sops …</span>
+              <span class="pill" id="rootCount"></span>
+              <span class="pill" id="authState"></span>
+            </div>
+            <p class="hero-help"><a href="/help.html" target="_blank" rel="noopener">Не знаете, с чего начать? Инструкция: подключение sops, ключи, файлы с компьютера →</a></p>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="art-card art-back"></div>
+            <div class="art-card art-front">
+              <div class="art-line"><span></span></div>
+              <div class="art-line"><span></span></div>
+              <div class="art-line"><span></span></div>
+              <div class="art-secret">ENC[AES256_GCM,data:••••]</div>
+              <div class="art-line"><span></span></div>
+            </div>
+            <div class="art-lock"><svg><use href="#i-lock"/></svg></div>
+          </div>
+        </div>
+
+        <div class="open-grid">
+          <div class="card open-card">
+            <div class="tabs" role="tablist">
+              <button class="tab active" data-tab="path" type="button">Файл на сервере</button>
+              <button class="tab" data-tab="git" type="button">Из git</button>
+              <button class="tab" data-tab="local" type="button">С компьютера</button>
+            </div>
+            <div class="tab-panel" id="tabPath">
+              <label class="field-label" for="pathInput">Путь к SOPS-файлу</label>
+              <div class="input-row">
+                <input id="pathInput" class="input mono" type="text" placeholder="/workspace/secrets/app.enc.yaml" autocomplete="off" spellcheck="false">
+                <button class="btn ghost" id="btnBrowse" type="button"><svg><use href="#i-folder"/></svg><span>Обзор</span></button>
+                <button class="btn primary" id="btnOpenPath" type="button">Открыть</button>
+              </div>
+              <p class="hint">Файл должен лежать внутри смонтированных каталогов. Путь можно вставить из проводника сервера или локального Docker-тома.</p>
+              <div class="root-links" id="rootLinks"></div>
+            </div>
+            <div class="tab-panel hidden" id="tabGit">
+              <div class="form-grid">
+                <label class="field-label" for="gitUrl">URL репозитория</label>
+                <input id="gitUrl" class="input mono" type="text" placeholder="https://git.example.net/group/secrets.git" autocomplete="off" spellcheck="false">
+                <label class="field-label" for="gitBranch">Ветка <span class="muted">(необязательно)</span></label>
+                <input id="gitBranch" class="input mono" type="text" placeholder="main" autocomplete="off" spellcheck="false">
+              </div>
+              <div class="input-row">
+                <button class="btn primary" id="btnClone" type="button">Клонировать в /data/repos</button>
+              </div>
+              <p class="hint">Для приватных HTTPS-репозиториев задайте <code>SOPS_EDITOR_GIT_TOKEN</code> на сервере. Для SSH смонтируйте ключ или агент. После клонирования откроется обзор каталога.</p>
+            </div>
+            <div class="tab-panel hidden" id="tabLocal">
+              <div class="drop-zone" id="localDrop">
+                <div class="drop-icon"><svg><use href="#i-file"/></svg></div>
+                <strong>Выберите файл на компьютере</strong>
+                <p>Зашифрованный файл расшифруется в памяти и откроется в редакторе; открытый YAML/JSON/dotenv/INI откроется как есть, а «Зашифровать» в редакторе создаст SOPS-версию.</p>
+                <div class="input-row center">
+                  <button class="btn primary" id="btnLocalPick" type="button">Выбрать файл</button>
+                  <input id="localFileInput" type="file" hidden accept=".yaml,.yml,.json,.env,.ini,.cfg,.conf,.enc,.txt,.encrypted,text/plain,application/octet-stream">
+                </div>
+                <p class="hint">Или перетащите файл сюда. Зашифрованный откроется после ввода ключа, открытый — сразу в редакторе.</p>
+                <div class="local-status hidden" id="localStatus" role="status"></div>
+              </div>
+              <p class="hint">Не знаете, как зашифровать файл и какой ключ выбрать? <a href="/help.html#local" target="_blank" rel="noopener">Документация: файл с компьютера</a>. Ключ расшифровки задаётся в разделе «Ключ» — серверный ключ не обязателен.</p>
+            </div>
+          </div>
+
+          <div class="card side-card">
+            <div class="card-head">
+              <h2>Ключ</h2>
+              <button class="btn tiny ghost" id="btnKeyOpen" type="button">Настроить</button>
+            </div>
+            <div class="key-state" id="keyState">
+              <div class="key-icon"><svg><use href="#i-key"/></svg></div>
+              <div>
+                <strong id="keyStateTitle">Проверяем…</strong>
+                <p id="keyStateText">Ключ нужен, чтобы расшифровать файл.</p>
+              </div>
+            </div>
+            <p class="hint">Впервые здесь? <a href="/help.html#sops" target="_blank" rel="noopener">Как подключить SOPS и age-ключ</a></p>
+            <hr>
+            <div class="card-head">
+              <h2>Недавние</h2>
+              <button class="btn tiny ghost" id="btnClearRecent" type="button">Очистить</button>
+            </div>
+            <div class="recent-list" id="recentList"><p class="muted small">Пока пусто.</p></div>
+          </div>
+        </div>
+
+        <div class="feature-row">
+          <div class="feature"><span class="feature-num">01</span><div><strong>sops edit</strong><p>Тот же механизм, что у штатного редактора: сохраняются мастер-ключи, MAC и политика шифрования.</p></div></div>
+          <div class="feature"><span class="feature-num">02</span><div><strong>Только в памяти</strong><p>Открытый текст не пишется на диск. На сервере остаются лишь зашифрованные резервные копии.</p></div></div>
+          <div class="feature"><span class="feature-num">03</span><div><strong>Git рядом</strong><p>Статус, коммит и push из интерфейса. Обратно в репозиторий уходит уже зашифрованный файл.</p></div></div>
+        </div>
+      </section>
+
+      <section class="editor-screen hidden" id="editorScreen">
+        <aside class="rail">
+          <div class="rail-section file-meta">
+            <div class="file-icon"><svg><use href="#i-file"/></svg></div>
+            <div class="file-title" id="fileName">—</div>
+            <button class="path-copy mono" id="filePath" type="button" title="Скопировать путь">—</button>
+            <div class="meta-chips" id="fileChips"></div>
+          </div>
+          <div class="rail-section local-rail hidden" id="localRail">
+            <div class="section-title"><span>Локальный файл</span></div>
+            <p class="muted small" id="localRailName">—</p>
+            <button class="btn subtle full" id="btnDownloadLocal" type="button">Скачать зашифрованный</button>
+            <button class="btn ghost full" id="btnWriteLocal" type="button">Записать в исходный файл</button>
+            <button class="btn ghost full" id="btnAllowWrite" type="button">Разрешить перезапись файла…</button>
+            <p class="hint hidden" id="localWriteHint"></p>
+          </div>
+          <div class="rail-section">
+            <div class="section-title"><span>Git</span><button class="icon-btn sm" id="btnPull" type="button" title="git pull --ff-only"><svg><use href="#i-refresh"/></svg></button></div>
+            <div id="gitBox" class="git-box"><p class="muted small">Не git-репозиторий.</p></div>
+            <button class="btn subtle full" id="btnCommit" type="button" disabled><svg><use href="#i-git"/></svg><span>Коммит</span></button>
+          </div>
+          <div class="rail-section grow">
+            <div class="section-title"><span>Резервные копии</span><button class="icon-btn sm" id="btnBackups" type="button" title="Все копии"><svg><use href="#i-history"/></svg></button></div>
+            <div id="backupBox" class="backup-box"><p class="muted small">Появятся после сохранения.</p></div>
+          </div>
+          <div class="rail-section rail-note">
+            <strong>Зашифровано обратно?</strong>
+            <p>После сохранения файл на диске уже SOPS. Проверьте <code>git diff</code> и закоммитьте.</p>
+          </div>
+        </aside>
+
+        <div class="editor-column">
+          <div class="editor-toolbar">
+            <div class="toolbar-left">
+              <span class="format-badge" id="formatBadge">YAML</span>
+              <span class="validation" id="validation">—</span>
+            </div>
+            <div class="toolbar-right">
+              <button class="btn tiny primary hidden" id="btnEncryptFile" type="button">Зашифровать</button>
+              <button class="btn tiny ghost" id="btnReload" type="button"><svg><use href="#i-refresh"/></svg><span>Перезагрузить</span></button>
+              <button class="btn tiny ghost" id="btnToggleSecrets" type="button" aria-pressed="true">Секреты <span class="count" id="secretCount">0</span></button>
+            </div>
+          </div>
+          <div class="editor-wrap">
+            <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+          </div>
+          <div class="statusbar">
+            <span id="statusCursor">Стр 1, стлб 1</span>
+            <span id="statusSize">—</span>
+            <span id="statusKeys">—</span>
+            <span class="status-right" id="statusSaved">—</span>
+          </div>
+        </div>
+
+        <aside class="secrets-panel" id="secretsPanel">
+          <div class="secrets-head">
+            <div><span class="section-kicker">Содержимое</span><h2>Секреты <span class="count" id="secretCount2">0</span></h2></div>
+            <button class="icon-btn" id="btnReveal" type="button" title="Показать/скрыть значения"><svg><use href="#i-eye"/></svg></button>
+          </div>
+          <div class="search-row">
+            <input class="input sm" id="secretSearch" type="search" placeholder="Фильтр по ключам…" autocomplete="off">
+          </div>
+          <div class="secrets-list" id="secretsList"></div>
+          <div class="secrets-foot">
+            <span id="secretsFoot">Значения скрыты</span>
+            <span class="muted">клик — к строке</span>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <!-- Long operation progress -->
+  <div class="progress-overlay hidden" id="progressOverlay" role="status" aria-live="polite" aria-busy="true">
+    <div class="progress-card">
+      <div class="progress-head">
+        <span class="spinner"></span>
+        <div class="progress-titles">
+          <strong id="progressTitle">Открываем файл…</strong>
+          <span id="progressFile" class="muted small mono"></span>
+        </div>
+        <span id="progressTime" class="progress-time mono">0.0 с</span>
+      </div>
+      <ol class="progress-steps" id="progressSteps"></ol>
+      <p class="progress-hint hidden" id="progressHint"></p>
+    </div>
+  </div>
+
+  <!-- File picker -->
+  <div class="modal-backdrop hidden" id="pickerModal" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+    <div class="modal wide">
+      <div class="modal-head">
+        <div><span class="section-kicker">Сервер</span><h2 id="pickerTitle">Выбор файла</h2></div>
+        <button class="icon-btn" data-close="pickerModal" type="button" title="Закрыть"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <div class="picker-roots" id="pickerRoots"></div>
+      <div class="picker-bar">
+        <button class="icon-btn" id="pickerUp" type="button" title="Вверх"><svg><use href="#i-back"/></svg></button>
+        <div class="picker-path mono" id="pickerPath">—</div>
+        <button class="btn tiny ghost" id="pickerRefresh" type="button">Обновить</button>
+      </div>
+      <div class="picker-tools">
+        <input class="input sm" id="pickerFilter" type="search" placeholder="Фильтр в каталоге…" autocomplete="off">
+        <label class="check"><input type="checkbox" id="pickerHidden"> скрытые</label>
+        <button class="btn tiny ghost" id="pickerSearchBtn" type="button">Искать по дереву</button>
+      </div>
+      <div class="picker-list" id="pickerList"></div>
+      <div class="picker-foot">
+        <span class="muted" id="pickerHint">Двойной клик по папке — войти, по файлу — открыть.</span>
+        <div class="row-gap">
+          <button class="btn ghost" data-close="pickerModal" type="button">Отмена</button>
+          <button class="btn ghost" id="pickerEncrypt" type="button" disabled>Зашифровать…</button>
+          <button class="btn primary" id="pickerChoose" type="button" disabled>Открыть файл</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key modal -->
+  <div class="modal-backdrop hidden" id="keyModal" role="dialog" aria-modal="true" aria-labelledby="keyTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <div><span class="section-kicker">age</span><h2 id="keyTitle">Приватный ключ</h2></div>
+        <button class="icon-btn" data-close="keyModal" type="button" title="Закрыть"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <div class="key-current" id="keyCurrent"></div>
+      <label class="field-label" for="keyInput">Вставьте ключ <code>AGE-SECRET-KEY-1…</code></label>
+      <textarea class="input mono textarea" id="keyInput" rows="4" placeholder="AGE-SECRET-KEY-1…&#10;…" spellcheck="false"></textarea>
+      <div class="input-row">
+        <label class="btn tiny ghost file-btn">Загрузить .txt<input type="file" id="keyFile" accept=".txt,text/plain"></label>
+        <button class="btn ghost" id="btnForgetKey" type="button">Забыть ключ</button>
+        <button class="btn primary" id="btnSaveKey" type="button">Сохранить в памяти</button>
+      </div>
+      <p class="hint">Ключ хранится только в памяти процесса и привязан к cookie этой вкладки. Он не пишется на диск и не попадает в логи. Ключ вкладки имеет приоритет над серверным, поэтому после его ввода файлы, зашифрованные только на серверный ключ, перестанут открываться — нажмите «Забыть ключ», чтобы вернуться к серверному. Для постоянного ключа смонтируйте <code>/keys/age.txt</code>.</p>
+      <p class="hint warn">Открывайте утилиту по HTTPS или на localhost: ключ и открытый текст идут по сети.</p>
+    </div>
+  </div>
+
+  <!-- Commit modal -->
+  <div class="modal-backdrop hidden" id="commitModal" role="dialog" aria-modal="true" aria-labelledby="commitTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <div><span class="section-kicker" id="commitBranch">git</span><h2 id="commitTitle">Коммит</h2></div>
+        <button class="icon-btn" data-close="commitModal" type="button" title="Закрыть"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <label class="field-label" for="commitMessage">Сообщение</label>
+      <input class="input" id="commitMessage" type="text" maxlength="500" autocomplete="off">
+      <label class="check"><input type="checkbox" id="commitPush"> запушить после коммита</label>
+      <p class="hint">Уйдёт только этот файл. Если push требует учётных данных, настройте токен/SSH на сервере.</p>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close="commitModal" type="button">Отмена</button>
+        <button class="btn primary" id="btnCommitRun" type="button">Закоммитить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diff modal -->
+  <div class="modal-backdrop hidden" id="diffModal" role="dialog" aria-modal="true" aria-labelledby="diffTitle">
+    <div class="modal wide">
+      <div class="modal-head">
+        <div><span class="section-kicker">до / после</span><h2 id="diffTitle">Изменения</h2></div>
+        <button class="icon-btn" data-close="diffModal" type="button" title="Закрыть"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <div class="diff-summary" id="diffSummary"></div>
+      <pre class="diff-view" id="diffView"></pre>
+    </div>
+  </div>
+
+  <!-- Backups modal -->
+  <div class="modal-backdrop hidden" id="backupsModal" role="dialog" aria-modal="true" aria-labelledby="backupsTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <div><span class="section-kicker">только шифротекст</span><h2 id="backupsTitle">Резервные копии</h2></div>
+        <button class="icon-btn" data-close="backupsModal" type="button" title="Закрыть"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <div class="backup-list" id="backupList"></div>
+      <p class="hint">Резервные копии лежат в <code>/data/backups</code> и содержат исходный зашифрованный файл.</p>
+    </div>
+  </div>
+
+  <!-- Encrypt modal -->
+  <div class="modal-backdrop hidden" id="encryptModal" role="dialog" aria-modal="true" aria-labelledby="encryptTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <div><span class="section-kicker">sops encrypt</span><h2 id="encryptTitle">Зашифровать файл</h2></div>
+        <button class="icon-btn" data-close="encryptModal" type="button" title="Закрыть"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <div class="key-current" id="encryptTarget"></div>
+      <label class="field-label" for="encryptRecipients">Получатели — публичные age-ключи</label>
+      <textarea class="input mono textarea" id="encryptRecipients" rows="3" placeholder="age1…&#10;age1… (необязательно)" spellcheck="false"></textarea>
+      <p class="hint" id="encryptDefault"></p>
+      <p class="hint warn hidden" id="encryptError"></p>
+      <p class="hint">Файл шифруется на сервере и остаётся только шифротекстом: из загруженного файла открытый текст удаляется сразу. Исходный файл на компьютере не меняется.</p>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close="encryptModal" type="button">Отмена</button>
+        <button class="btn primary" id="btnEncryptRun" type="button">Зашифровать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm modal -->
+  <div class="modal-backdrop hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <div><span class="section-kicker">внимание</span><h2 id="confirmTitle">Подтверждение</h2></div>
+        <button class="icon-btn" data-close="confirmModal" type="button" title="Закрыть"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <p id="confirmText"></p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="confirmCancel" type="button">Отмена</button>
+        <button class="btn danger" id="confirmOk" type="button">Продолжить</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/vendor/codemirror/codemirror.min.js"></script>
+  <script src="/vendor/codemirror/mode/yaml/yaml.min.js"></script>
+  <script src="/vendor/codemirror/mode/javascript/javascript.min.js"></script>
+  <script src="/vendor/codemirror/mode/properties/properties.min.js"></script>
+  <script src="/vendor/codemirror/addon/edit/matchbrackets.min.js"></script>
+  <script src="/vendor/codemirror/addon/edit/closebrackets.min.js"></script>
+  <script src="/vendor/codemirror/addon/selection/active-line.min.js"></script>
+  <script src="/vendor/codemirror/addon/search/searchcursor.min.js"></script>
+  <script src="/vendor/codemirror/addon/search/search.min.js"></script>
+  <script src="/vendor/codemirror/addon/dialog/dialog.min.js"></script>
+  <script src="/vendor/codemirror/addon/fold/foldcode.min.js"></script>
+  <script src="/vendor/codemirror/addon/fold/foldgutter.min.js"></script>
+  <script src="/vendor/codemirror/addon/fold/brace-fold.min.js"></script>
+  <script src="/vendor/codemirror/addon/fold/indent-fold.min.js"></script>
+  <script src="/vendor/codemirror/addon/fold/comment-fold.min.js"></script>
+  <script src="/vendor/codemirror/addon/display/placeholder.min.js"></script>
+  <script src="/vendor/js-yaml.min.js"></script>
+  <script src="/vendor/diff.min.js"></script>
+  <script src="/i18n.js?v=6"></script>
+  <script src="/app.js?v=16"></script>
+</body>
+</html>
