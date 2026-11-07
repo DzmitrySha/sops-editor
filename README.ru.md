@@ -267,14 +267,14 @@ docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
 
 ## Разработка и тесты
 
-```bash
-python -m venv .venv
-.venv/Scripts/pip install -e "backend[test]"      # Windows
-# .venv/bin/pip install -e "backend[test]"        # Linux / macOS
+Зависимости управляются через [uv](https://docs.astral.sh/uv/) и зафиксированы в
+`backend/uv.lock`:
 
+```bash
 cd backend
-../.venv/Scripts/python -m pytest -q              # 32 теста
-../.venv/Scripts/python -m ruff check app tests
+uv sync --extra test        # создаёт backend/.venv по uv.lock
+uv run pytest -q            # 32 теста
+uv run ruff check app tests
 ```
 
 Тесты работают с настоящими `sops` и `age-keygen`. На Windows положите бинарники в
@@ -286,7 +286,7 @@ cd backend
 ```bash
 cd backend
 SOPS_EDITOR_ROOTS="D:/repo|D:/tmp/repos" SOPS_AGE_KEY_FILE="D:/keys/age.txt" \
-  ../.venv/Scripts/python -m uvicorn app.main:create_app --factory --port 8787
+  uv run uvicorn app.main:create_app --factory --port 8787
 ```
 
 Фронтенд — статические файлы, сборки нет: правьте `frontend/*.js|css|html` и
@@ -297,6 +297,7 @@ SOPS_EDITOR_ROOTS="D:/repo|D:/tmp/repos" SOPS_AGE_KEY_FILE="D:/keys/age.txt" \
 ```text
 backend/app/        FastAPI: sops, файлы, git, сессии, безопасность
 backend/tests/      pytest с настоящим sops
+backend/uv.lock     зафиксированный набор зависимостей (uv)
 frontend/           статический UI (CodeMirror рядом), help.html + help.en.html, i18n.js
 docker/             примеры окружения
 docker-compose*.yml локальный / Traefik / офлайн

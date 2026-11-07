@@ -7,18 +7,18 @@ Thanks for taking the time to improve SOPS Editor.
 Requirements: Python 3.12+, Docker (optional), and the `sops` + `age-keygen`
 binaries on `PATH` (or in `.tools/` on Windows).
 
-```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# Linux/macOS: source .venv/bin/activate
-pip install -e "backend[test]"
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) and pinned in
+`backend/uv.lock` — do not add them by hand.
 
+```bash
 cd backend
-SOPS_EDITOR_ROOTS=/path/to/checkout \
-SOPS_EDITOR_STORAGE=/tmp/sops-data \
-SOPS_AGE_KEY_FILE=/path/to/age.txt \
-python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8787
+uv sync --extra test      # creates backend/.venv from the lockfile
+uv run uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8787
 ```
+
+Set `SOPS_EDITOR_ROOTS`, `SOPS_EDITOR_STORAGE` and `SOPS_AGE_KEY_FILE` in the shell
+before starting. After changing dependencies in `backend/pyproject.toml`, run
+`uv lock` and commit the updated `uv.lock`.
 
 The frontend is plain static files (`frontend/`): no build step, no bundler.
 Reload the page after editing `app.js`, `styles.css`, `i18n.js` or `help*.html`.
@@ -30,7 +30,8 @@ Docker workflow: `docker build -t ai-sops-edit:local .` and
 
 ```bash
 cd backend
-python -m pytest -q
+uv run pytest -q
+uv run ruff check app tests
 ```
 
 Tests that need `sops`/`age-keygen` are skipped when the binaries are missing,

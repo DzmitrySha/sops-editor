@@ -53,7 +53,7 @@ curl -s http://localhost:8787/api/health      # {"status":"ok","sops":"sops 3.13
         <h3>Вариант B. Запуск без Docker (Windows, локальная разработка)</h3>
         <ol>
           <li>Положите <code>sops.exe</code> и <code>age\age-keygen.exe</code> в каталог <code>.tools\</code> проекта (или добавьте их в <code>PATH</code>).</li>
-          <li>Создайте виртуальное окружение и поставьте зависимости: <code>.venv\Scripts\pip install -e "backend[test]"</code>.</li>
+          <li>Поставьте <a href="https://docs.astral.sh/uv/">uv</a> и зависимости: <code>cd backend</code> → <code>uv sync --extra test</code> (использует <code>uv.lock</code>, создаёт <code>backend\.venv</code>).</li>
           <li>Запустите сервер, указав корни и ключ:</li>
         </ol>
 <pre><code>set SOPS_EDITOR_ROOTS=D:\repo|D:\tmp\repos
@@ -62,7 +62,7 @@ set SOPS_AGE_KEY_FILE=D:\keys\age.txt
 set SOPS_EDITOR_SOPS_BIN=D:\project\.tools\sops.exe
 set SOPS_EDITOR_AGE_KEYGEN_BIN=D:\project\.tools\age\age-keygen.exe
 cd backend
-..\.venv\Scripts\python -m uvicorn app.main:create_app --factory --port 8787</code></pre>
+uv run uvicorn app.main:create_app --factory --port 8787</code></pre>
 
         <h3>Вариант C. Установка sops в систему</h3>
 <pre><code># Windows (winget / scoop / choco)

@@ -269,14 +269,14 @@ The interactive documentation follows the app language: `?lang=en` on
 
 ## Development and tests
 
-```bash
-python -m venv .venv
-.venv/Scripts/pip install -e "backend[test]"      # Windows
-# .venv/bin/pip install -e "backend[test]"        # Linux / macOS
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) and pinned in
+`backend/uv.lock`:
 
+```bash
 cd backend
-../.venv/Scripts/python -m pytest -q              # 32 tests
-../.venv/Scripts/python -m ruff check app tests
+uv sync --extra test        # creates backend/.venv from uv.lock
+uv run pytest -q            # 32 tests
+uv run ruff check app tests
 ```
 
 The tests run against real `sops` and `age-keygen`. On Windows put the binaries
@@ -288,7 +288,7 @@ Run without Docker:
 ```bash
 cd backend
 SOPS_EDITOR_ROOTS="D:/repo|D:/tmp/repos" SOPS_AGE_KEY_FILE="D:/keys/age.txt" \
-  ../.venv/Scripts/python -m uvicorn app.main:create_app --factory --port 8787
+  uv run uvicorn app.main:create_app --factory --port 8787
 ```
 
 The frontend is plain static files — no build step. Edit `frontend/*.js|css|html`
@@ -299,6 +299,7 @@ and reload the page.
 ```text
 backend/app/        FastAPI: sops, files, git, sessions, security
 backend/tests/      pytest against real sops
+backend/uv.lock     locked dependency set (uv)
 frontend/           static UI (vendored CodeMirror), help.html + help.en.html, i18n.js
 docker/             environment examples
 docker-compose*.yml local / Traefik / offline overlays

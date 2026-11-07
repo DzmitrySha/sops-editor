@@ -5,6 +5,9 @@ ARG TARGETARCH=amd64
 ARG SOPS_VERSION=3.13.3
 ARG AGE_VERSION=1.3.2
 
+# uv installs the Python package; the binary is copied from the official image.
+COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /uvx /usr/local/bin/
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -45,7 +48,8 @@ RUN set -eux; \
 
 WORKDIR /app
 COPY backend /app/backend
-RUN pip install --no-cache-dir /app/backend \
+RUN uv pip install --system --no-cache /app/backend \
+    && rm -f /usr/local/bin/uv /usr/local/bin/uvx \
     && python -c "import pathlib, app, os; p = pathlib.Path(app.__file__).parent / 'sops_editor_helper.py'; os.chmod(p, 0o755); print(p)"
 COPY frontend /app/frontend
 
