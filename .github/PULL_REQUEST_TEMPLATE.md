@@ -11,7 +11,7 @@
 - [ ] `cd backend && pytest -q`
 - [ ] `cd backend && ruff check app tests`
 - [ ] Ran the app and checked the changed screen/flow in a browser
-- [ ] Docs updated (`README.md`, `README.ru.md`, in-app help RU/EN) if behaviour changed
+- [ ] Docs updated (`.github/README.md` EN, `README.md` RU, in-app help RU/EN) if behaviour changed
 
 ## Screenshots (UI changes)
 
