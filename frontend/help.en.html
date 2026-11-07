@@ -191,7 +191,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
           <tbody>
             <tr><td>Commit</td><td><code>git add -- file</code> + <code>git commit -- file</code>; only the open file is committed. The “push” checkbox pushes after the commit.</td></tr>
             <tr><td>↻ (pull)</td><td><code>git pull --ff-only</code>, only with a clean worktree. The file is reloaded after the pull.</td></tr>
-            <tr><td>Diff with HEAD</td><td>Decrypts the <code>HEAD</code> version and the current file and shows them side by side in two columns with line numbers. Both sides are decrypted in the server process; the browser receives plaintext, exactly as when opening the file.</td></tr>
+            <tr><td>Diff with HEAD</td><td>Opens the “Changes” window straight on the “With HEAD” tab: the server decrypts the <code>HEAD</code> version and the current file, and they are shown side by side in two columns with line numbers. Both sides are decrypted in the server process; the browser receives plaintext, exactly as when opening the file.</td></tr>
             <tr><td>From git</td><td><code>git clone</code> into <code>/data/repos/&lt;name&gt;</code>.</td></tr>
           </tbody>
         </table>
@@ -249,7 +249,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
             <tr><td>Language</td><td>RU/EN switch in the header; the help page follows it.</td></tr>
             <tr><td>Editor</td><td>CodeMirror: YAML/JSON/dotenv/INI highlighting, <kbd>Ctrl</kbd>+<kbd>F</kbd> search, folding, live syntax check.</td></tr>
             <tr><td>Secrets</td><td>Key tree, filter, jump to line, copy a value, show/hide values.</td></tr>
-            <tr><td>Changes</td><td>Diff between the opened version and the current text.</td></tr>
+            <tr><td>Changes</td><td>A two-column comparison with line numbers and two tabs: “In editor” — the current text against the opened version, “With HEAD” — the decrypted version from the last commit.</td></tr>
             <tr><td>Save</td><td>SOPS files are encrypted with <code>sops edit</code>; plain files are written as is. The button shows “Encrypting…” while it works.</td></tr>
             <tr><td>Encrypt (in editor)</td><td>Appears for a plain file: creates the SOPS version with recipients from <code>.sops.yaml</code> or the server key.</td></tr>
             <tr><td>Backups</td><td>List and download encrypted copies.</td></tr>

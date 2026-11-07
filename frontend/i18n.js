@@ -418,6 +418,12 @@
     "Не удалось прочитать версию из HEAD": "Could not read the HEAD version",
     "Файл:": "File:",
     "Получатели:": "Recipients:",
+    "В редакторе": "In editor",
+    "С HEAD": "With HEAD",
+    "Источник сравнения": "Comparison source",
+    "Изменений нет — документ совпадает с открытой версией.": "No changes — the document matches the opened version.",
+    "строк": "lines",
+    "Файл не входит в git-репозиторий.": "The file is not inside a git repository.",
   };
 
   // ------------------------------------------------------- dynamic patterns
@@ -480,7 +486,7 @@
     const element = node.nodeType === 1 ? node : node.parentElement;
     if (!element) return true;
     if (SKIP_TAGS.has(element.tagName)) return true;
-    return Boolean(element.closest(".CodeMirror, #secretsList, .diff-view, .diff-cols, .lang-switch"));
+    return Boolean(element.closest(".CodeMirror, #secretsList, .diff-cols, .lang-switch"));
   }
 
   function translateElement(root) {
@@ -537,8 +543,25 @@
           const next = translate(mutation.target.nodeValue);
           if (next !== mutation.target.nodeValue) mutation.target.nodeValue = next;
         }
+        if (mutation.type === "attributes" && mutation.target.getAttribute) {
+          const element = mutation.target;
+          if (!skip(element)) {
+            const attr = mutation.attributeName;
+            const value = element.getAttribute(attr);
+            if (value) {
+              const next = translate(value);
+              if (next !== value) element.setAttribute(attr, next);
+            }
+          }
+        }
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ATTRS,
+    });
   });
 })();

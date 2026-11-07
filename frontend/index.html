@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/vendor/codemirror/codemirror.min.css">
   <link rel="stylesheet" href="/vendor/codemirror/addon/dialog/dialog.min.css">
   <link rel="stylesheet" href="/vendor/codemirror/addon/fold/foldgutter.min.css">
-  <link rel="stylesheet" href="/styles.css?v=17">
+  <link rel="stylesheet" href="/styles.css?v=18">
 </head>
 <body>
   <svg class="svg-defs" aria-hidden="true">
@@ -324,23 +324,15 @@
         <div><span class="section-kicker">до / после</span><h2 id="diffTitle">Изменения</h2></div>
         <button class="icon-btn" data-close="diffModal" type="button" title="Закрыть"><svg><use href="#i-x"/></svg></button>
       </div>
-      <div class="diff-summary" id="diffSummary"></div>
-      <pre class="diff-view" id="diffView"></pre>
-    </div>
-  </div>
-
-  <!-- Git diff modal -->
-  <div class="modal-backdrop hidden" id="gitDiffModal" role="dialog" aria-modal="true" aria-labelledby="gitDiffTitle">
-    <div class="modal wide">
-      <div class="modal-head">
-        <div><span class="section-kicker">git diff</span><h2 id="gitDiffTitle">Дифф с HEAD</h2></div>
-        <button class="icon-btn" data-close="gitDiffModal" type="button" title="Закрыть"><svg><use href="#i-x"/></svg></button>
+      <div class="diff-tabs" role="tablist" aria-label="Источник сравнения">
+        <button class="diff-tab active" id="diffTabLocal" type="button" role="tab" aria-selected="true">В редакторе</button>
+        <button class="diff-tab" id="diffTabHead" type="button" role="tab" aria-selected="false">С HEAD</button>
       </div>
-      <div class="diff-summary" id="gitDiffSummary"></div>
-      <div class="diff-cols" id="gitDiffView"></div>
-      <p class="hint" id="gitDiffNote"></p>
+      <div class="diff-summary" id="diffSummary"></div>
+      <div class="diff-cols" id="diffView"></div>
+      <p class="hint" id="diffNote"></p>
       <div class="modal-actions">
-        <button class="btn ghost" data-close="gitDiffModal" type="button">Закрыть</button>
+        <button class="btn ghost" data-close="diffModal" type="button">Закрыть</button>
       </div>
     </div>
   </div>
@@ -434,7 +426,7 @@
   <script src="/vendor/codemirror/addon/display/placeholder.min.js"></script>
   <script src="/vendor/js-yaml.min.js"></script>
   <script src="/vendor/diff.min.js"></script>
-  <script src="/i18n.js?v=8"></script>
-  <script src="/app.js?v=19"></script>
+  <script src="/i18n.js?v=9"></script>
+  <script src="/app.js?v=20"></script>
 </body>
 </html>

@@ -26,6 +26,7 @@
     pendingKeyInfo: null,
     pendingPlainFile: null,
     pendingGitDiff: null,
+    diffTab: "local",
     encrypt: null,
     progressTimer: null,
     progressStarted: 0,
@@ -1835,82 +1836,11 @@
   }
 
   // -------------------------------------------------------------------- diff
-  function openDiff() {
-    if (!state.file || !state.editor) return;
-    const current = state.editor.getValue();
-    if (current === state.original) {
-      toast("Изменений нет", "Документ совпадает с открытой версией.", "");
-      return;
-    }
-    const parts = window.Diff ? Diff.diffLines(state.original, current) : [{ value: current, added: true }];
-    let added = 0;
-    let removed = 0;
-    const view = $("diffView");
-    view.innerHTML = "";
-    for (const part of parts) {
-      const lines = part.value.replace(/\n$/, "").split("\n");
-      if (part.added) added += lines.length;
-      if (part.removed) removed += lines.length;
-      for (const line of lines) {
-        const span = document.createElement("span");
-        span.className = `diff-line ${part.added ? "add" : part.removed ? "del" : "ctx"}`;
-        span.textContent = `${part.added ? "+" : part.removed ? "-" : " "} ${line}`;
-        view.append(span);
-      }
-    }
-    $("diffSummary").innerHTML = `<span class="add">+${added}</span> / <span class="del">−${removed}</span> · строк`;
-    openModal("diffModal");
-  }
-
-  function gitDiffNote() {
-    return state.dirty
-      ? "В редакторе есть несохранённые правки — в дифф они не входят."
-      : "";
-  }
-
-  function openGitDiff() {
-    if (!state.file || !state.file.git) return;
-    const holder = $("gitDiffView");
-    holder.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
-    $("gitDiffSummary").textContent = "";
-    $("gitDiffNote").textContent = gitDiffNote();
-    openModal("gitDiffModal");
-    trackedOperation({
-      url: `/api/git/diff?path=${encodeURIComponent(state.file.path)}`,
-      steps: GIT_DIFF_STEPS,
-      title: "Дифф с HEAD",
-      subtitle: state.file.name,
-    })
-      .then((data) => renderGitDiff(data))
-      .catch((error) => {
-        if (error instanceof ApiError && error.code === "key_required") {
-          state.pendingGitDiff = state.file.path;
-          state.pendingKeyInfo = (error.details && error.details.encrypted) || null;
-          closeModal("gitDiffModal");
-          openKeyModal("Ключ не подходит для этого файла. Задайте другой приватный ключ.");
-          return;
-        }
-        $("gitDiffView").innerHTML = "";
-        $("gitDiffView").append(emptyNode(error.message || String(error)));
-      })
-      .finally(() => hideProgress());
-  }
-
-  function renderGitDiff(data) {
-    const head = data.head;
-    const view = $("gitDiffView");
-    view.innerHTML = "";
-    $("gitDiffNote").textContent = head === null
-      ? "Файл ещё не закоммичен: вся версия новая."
-      : gitDiffNote();
-    if (head && head.binary) {
-      view.append(emptyNode("Бинарный файл — дифф недоступен."));
-      $("gitDiffSummary").textContent = "";
-      return;
-    }
-    const left = head ? head.content : "";
-    const right = data.current.content || "";
-    const parts = window.Diff ? Diff.diffLines(left, right) : [{ value: right, added: true }];
+  function renderSplitDiff(container, left, right) {
+    container.innerHTML = "";
+    const parts = window.Diff
+      ? Diff.diffLines(left || "", right || "")
+      : [{ value: right || "", added: true }];
     let added = 0;
     let removed = 0;
     let ln = 0;
@@ -1949,15 +1879,117 @@
           rightCell.textContent = line;
         }
         row.append(leftNum, leftCell, rightNum, rightCell);
-        view.append(row);
+        container.append(row);
       }
     }
-    const commit = head && head.commit;
-    $("gitDiffSummary").innerHTML =
-      `<span class="add">+${added}</span> / <span class="del">−${removed}</span> · строк` +
-      (commit
-        ? ` · HEAD ${escapeHtml(commit.hash)} · ${escapeHtml(commit.subject)}`
-        : "");
+    return { added, removed };
+  }
+
+  function renderDiffSummary(stats, commit) {
+    const holder = $("diffSummary");
+    holder.textContent = "";
+    const add = document.createElement("span");
+    add.className = "add";
+    add.textContent = `+${stats.added}`;
+    const del = document.createElement("span");
+    del.className = "del";
+    del.textContent = `−${stats.removed}`;
+    const meta = document.createElement("span");
+    meta.textContent = ` · ${stats.added + stats.removed} ${window.i18n ? window.i18n.tr("строк") : "строк"}`;
+    holder.append(add, document.createTextNode(" / "), del, meta);
+    if (commit) {
+      const info = document.createElement("span");
+      info.className = "mono";
+      info.textContent = ` · HEAD ${commit.hash} · ${commit.subject}`;
+      holder.append(info);
+    }
+  }
+
+  function renderLocalDiff() {
+    const current = state.editor ? state.editor.getValue() : "";
+    const stats = renderSplitDiff($("diffView"), state.original, current);
+    $("diffNote").textContent = stats.added + stats.removed === 0
+      ? "Изменений нет — документ совпадает с открытой версией."
+      : "";
+    renderDiffSummary(stats);
+  }
+
+  async function loadGitDiff() {
+    if (!state.file || !state.file.git) {
+      $("diffSummary").textContent = "";
+      $("diffNote").textContent = "";
+      $("diffView").innerHTML = "";
+      $("diffView").append(emptyNode("Файл не входит в git-репозиторий."));
+      return;
+    }
+    $("diffView").innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+    $("diffSummary").textContent = "";
+    $("diffNote").textContent = state.dirty
+      ? "В редакторе есть несохранённые правки — в дифф они не входят."
+      : "";
+    try {
+      const data = await trackedOperation({
+        url: `/api/git/diff?path=${encodeURIComponent(state.file.path)}`,
+        steps: GIT_DIFF_STEPS,
+        title: "Дифф с HEAD",
+        subtitle: state.file.name,
+      });
+      renderGitDiff(data);
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "key_required") {
+        state.pendingGitDiff = state.file.path;
+        state.pendingKeyInfo = (error.details && error.details.encrypted) || null;
+        closeModal("diffModal");
+        openKeyModal("Ключ не подходит для этого файла. Задайте другой приватный ключ.");
+        return;
+      }
+      $("diffSummary").textContent = "";
+      $("diffView").innerHTML = "";
+      $("diffView").append(emptyNode(error.message || String(error)));
+    } finally {
+      hideProgress();
+    }
+  }
+
+  function renderGitDiff(data) {
+    const head = data.head;
+    $("diffNote").textContent = head === null
+      ? "Файл ещё не закоммичен: вся версия новая."
+      : state.dirty
+        ? "В редакторе есть несохранённые правки — в дифф они не входят."
+        : "";
+    if (head && head.binary) {
+      $("diffView").innerHTML = "";
+      $("diffView").append(emptyNode("Бинарный файл — дифф недоступен."));
+      $("diffSummary").textContent = "";
+      return;
+    }
+    const stats = renderSplitDiff($("diffView"), head ? head.content : "", data.current.content || "");
+    renderDiffSummary(stats, head && head.commit);
+  }
+
+  function setDiffTab(tab) {
+    state.diffTab = tab;
+    const local = tab === "local";
+    $("diffTabHead").disabled = !(state.file && state.file.git);
+    $("diffTabLocal").classList.toggle("active", local);
+    $("diffTabHead").classList.toggle("active", !local);
+    $("diffTabLocal").setAttribute("aria-selected", String(local));
+    $("diffTabHead").setAttribute("aria-selected", String(!local));
+    if (local) renderLocalDiff();
+    else loadGitDiff();
+  }
+
+  function openDiff() {
+    if (!state.file || !state.editor) return;
+    openModal("diffModal");
+    setDiffTab("local");
+  }
+
+  function openGitDiff() {
+    if (!state.file) return;
+    openModal("diffModal");
+    setDiffTab("head");
   }
 
   // -------------------------------------------------------------------- picker
@@ -2235,6 +2267,8 @@
     $("btnTheme").addEventListener("click", toggleTheme);
     $("btnSave").addEventListener("click", saveFile);
     $("btnDiff").addEventListener("click", openDiff);
+    $("diffTabLocal").addEventListener("click", () => setDiffTab("local"));
+    $("diffTabHead").addEventListener("click", () => setDiffTab("head"));
     $("btnReload").addEventListener("click", async () => {
       if (!state.file) return;
       if (state.dirty) {
