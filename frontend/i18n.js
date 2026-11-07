@@ -178,6 +178,9 @@
     "sops недоступен": "sops unavailable",
     "Basic auth включён": "Basic auth enabled",
     "Доступ без пароля": "No password",
+    " — как включить": " — how to enable",
+    "HTTP Basic auth выключен: сервер отвечает без пароля. Задайте SOPS_EDITOR_AUTH_PASSWORD или SOPS_EDITOR_AUTH_MODE=header. Нажмите, чтобы открыть справку.":
+      "HTTP Basic auth is disabled: the server answers without a password. Set SOPS_EDITOR_AUTH_PASSWORD or SOPS_EDITOR_AUTH_MODE=header. Click to open the docs.",
     "без пароля": "no password",
     "ключ в сессии": "session key",
     "ключ сервера": "server key",

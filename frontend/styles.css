@@ -510,6 +510,9 @@ h1 { margin: 0 0 14px; font-size: clamp(32px, 4vw, 52px); line-height: 1.02; let
 }
 
 /* late additions */
+.pill a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+a.chip { text-decoration: none; }
+a.chip:hover { border-color: var(--warn); }
 .pill.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, var(--border)); }
 .pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, var(--border)); }
 .pill.bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }

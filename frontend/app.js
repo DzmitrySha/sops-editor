@@ -496,11 +496,24 @@
     if (!status) return;
     const key = state.key || status.key || {};
     $("rootCount").textContent = `${status.roots.length} каталог${status.roots.length === 1 ? "" : "а"}`;
-    $("authState").textContent = status.auth_enabled ? "Basic auth включён" : "Доступ без пароля";
-    $("authState").className = `pill ${status.auth_enabled ? "" : "warn"}`;
+    const authState = $("authState");
+    authState.textContent = status.auth_enabled ? "Basic auth включён" : "Доступ без пароля";
+    authState.className = `pill ${status.auth_enabled ? "" : "warn"}`;
+    if (!status.auth_enabled) {
+      const howto = document.createElement("a");
+      howto.href = "/help.html#auth";
+      howto.target = "_blank";
+      howto.rel = "noopener";
+      howto.textContent = " — как включить";
+      authState.append(howto);
+    }
     $("authChip").hidden = status.auth_enabled;
     $("authChip").textContent = "без пароля";
     $("authChip").className = "chip warn";
+    $("authChip").title =
+      "HTTP Basic auth выключен: сервер отвечает без пароля. "
+      + "Задайте SOPS_EDITOR_AUTH_PASSWORD или SOPS_EDITOR_AUTH_MODE=header. "
+      + "Нажмите, чтобы открыть справку.";
     $("btnBrowse").disabled = !status.roots.length;
 
     const labels = {
@@ -556,6 +569,7 @@
       rootLinks.innerHTML = '<span class="hint">Каталоги не заданы: SOPS_EDITOR_ROOTS.</span>';
     }
     renderKeyChip();
+    updateActionButtons();
   }
 
   function renderKeyChip() {
@@ -682,6 +696,8 @@
     const hasGit = Boolean(state.file && state.file.git);
     $("btnSave").disabled = !hasFile || state.busy;
     $("btnDiff").disabled = !hasFile;
+    $("btnSave").classList.toggle("hidden", !hasFile);
+    $("btnDiff").classList.toggle("hidden", !hasFile);
     $("btnCommit").disabled = !hasGit || state.busy;
     $("btnPull").disabled = !hasGit || state.busy;
     $("btnGitDiff").disabled = !hasGit || state.busy;
@@ -1233,6 +1249,7 @@
     history.replaceState({}, "", location.pathname);
     document.title = "SOPS Editor";
     if (state.editor) state.editor.setValue("");
+    updateActionButtons();
   }
 
   async function requestCloseFile() {

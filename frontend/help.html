@@ -221,6 +221,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
         <p><strong>Режим <code>header</code> нельзя открывать напрямую:</strong> заголовок легко подделать. Держите порт на loopback или внутренней сети, пускайте трафик только через прокси. <code>GET /api/status</code> возвращает текущий режим и имя пользователя из заголовка — это удобно для проверки:</p>
         <pre><code>curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status
 # {"auth_mode":"header","user":"alice", ...}</code></pre>
+        <p>В шапке приложения индикатор <span class="mono">без пароля</span> (жёлтый) виден, когда Basic auth выключен: сервер принимает запросы без пароля. Нажмите на него — откроется этот раздел. В герое главной страницы рядом стоит ссылка «как включить».</p>
         <p>Пример для Traefik: на маршрут приложения навешивается middleware oauth2-proxy, а контейнеру задаются <code>SOPS_EDITOR_AUTH_MODE=header</code> и подсеть прокси в <code>SOPS_EDITOR_AUTH_TRUSTED_PROXIES</code>.</p>
       </section>
 

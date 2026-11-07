@@ -213,6 +213,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
         <p><strong>Never expose <code>header</code> mode directly:</strong> the header is easy to forge. Keep the port on loopback or an internal network and let only the proxy reach it. <code>GET /api/status</code> returns the current mode and the header identity — handy for a check:</p>
         <pre><code>curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status
 # {"auth_mode":"header","user":"alice", ...}</code></pre>
+        <p>In the header the yellow <span class="mono">no password</span> chip means Basic auth is disabled: the server accepts requests without a password. Click it to jump to this section; the home page hero has a “how to enable” link next to the same warning.</p>
         <p>With Traefik, attach an oauth2-proxy middleware to the router and give the container <code>SOPS_EDITOR_AUTH_MODE=header</code> plus the proxy subnet in <code>SOPS_EDITOR_AUTH_TRUSTED_PROXIES</code>.</p>
       </section>
 
