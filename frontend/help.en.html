@@ -249,6 +249,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
             <tr><td>Language</td><td>RU/EN switch in the header; the help page follows it.</td></tr>
             <tr><td>Editor</td><td>CodeMirror: YAML/JSON/dotenv/INI highlighting, <kbd>Ctrl</kbd>+<kbd>F</kbd> search, folding, live syntax check.</td></tr>
             <tr><td>Secrets</td><td>Key tree, filter, jump to line, copy a value, show/hide values.</td></tr>
+            <tr><td>1 pane / 2 panes</td><td>Editor toolbar button that opens the changes pane: old lines in red, new lines in green, 3 lines of context around each changed region. It updates as you type and follows the editor scroll. The choice is remembered.</td></tr>
             <tr><td>Changes</td><td>A two-column comparison with line numbers and two tabs: “In editor” — the current text against the opened version, “With HEAD” — the decrypted version from the last commit.</td></tr>
             <tr><td>Save</td><td>SOPS files are encrypted with <code>sops edit</code>; plain files are written as is. The button shows “Encrypting…” while it works.</td></tr>
             <tr><td>Encrypt (in editor)</td><td>Appears for a plain file: creates the SOPS version with recipients from <code>.sops.yaml</code> or the server key.</td></tr>

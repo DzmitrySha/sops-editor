@@ -64,6 +64,7 @@ Open a file from a git checkout, a cloned repository or your own computer — it
 | **Plain files too** | A plain YAML / JSON / dotenv / INI file opens without a key; the **Encrypt** button creates a SOPS version — with `.sops.yaml`, an explicit age recipient or the server key. |
 | **Real editor** | CodeMirror with YAML/JSON highlighting, search, folding, `Ctrl+S`, live syntax validation and a masked secret tree that jumps to a line. |
 | **Keys, three ways** | Server key file, environment/`SOPS_AGE_KEY`, or a key pasted in the UI (process memory only, TTL 8 h, bound to the tab cookie). Missing key? The dialog shows the recipients from the file metadata. |
+| **Live changes pane** | A toolbar toggle splits the editor: the second pane shows only the changed regions (old lines red, new green, 3 lines of context) and keeps up with typing and scrolling. A separate window compares the working file with `HEAD`, decrypted and side by side. |
 | **Visible progress** | Opening, uploading and saving show the real phases (path check, SOPS metadata, `sops decrypt`, format detection, git) with an elapsed timer — no dead spinners. |
 | **Git built in** | Branch/file status, committing only the current file, push, `pull --ff-only`, clone from a URL into `/data/repos`. |
 | **Bilingual** | RU/EN switch in the header; the documentation follows the language and the theme. |

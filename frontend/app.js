@@ -6,6 +6,7 @@
   const RECENT_KEY = "sops-editor-recent-v1";
   const THEME_KEY = "sops-editor-theme";
   const REVEAL_KEY = "sops-editor-reveal";
+  const SPLIT_KEY = "sops-editor-split";
   const MAX_SECRET_ROWS = 800;
 
   const state = {
@@ -18,6 +19,7 @@
     dirty: false,
     busy: false,
     showValues: sessionStorage.getItem(REVEAL_KEY) === "1",
+    split: false,
     secretsOpen: true,
     parsed: null,
     valid: false,
@@ -644,9 +646,20 @@
     });
     state.editor.on("change", onEditorChange);
     state.editor.on("cursorActivity", updateCursor);
+    state.editor.on("scroll", scheduleDiffSync);
   }
 
   const validateSoon = debounce(() => validateCurrent(), 220);
+  const diffSoon = debounce(() => renderEditorDiff(), 180);
+  let diffSyncFrame = 0;
+
+  function scheduleDiffSync() {
+    if (!state.split || diffSyncFrame) return;
+    diffSyncFrame = requestAnimationFrame(() => {
+      diffSyncFrame = 0;
+      syncEditorDiffScroll();
+    });
+  }
 
   function onEditorChange() {
     if (state.suppressChange) return;
@@ -654,6 +667,7 @@
     const value = state.editor.getValue();
     setDirty(value !== state.original);
     validateSoon();
+    if (state.split) diffSoon();
   }
 
   function setDirty(dirty) {
@@ -1124,6 +1138,7 @@
     state.suppressChange -= 1;
     setDirty(false);
     validateCurrent();
+    if (state.split) renderEditorDiff();
     renderFileChips();
     renderLocalRail();
     if (state.local && pathKey(state.local.path) === pathKey(file.path)) {
@@ -1627,6 +1642,7 @@
       state.suppressChange -= 1;
       setDirty(false);
       validateCurrent();
+      if (state.split) renderEditorDiff();
       renderFileChips();
       renderLocalRail();
       renderGit();
@@ -1833,6 +1849,146 @@
       }
     }
     openModal("backupsModal");
+  }
+
+  // ------------------------------------------------------- editor split pane
+  function setSplit(enabled, { persist = true } = {}) {
+    state.split = Boolean(enabled);
+    $("editorWrap").classList.toggle("split", state.split);
+    $("editorDiff").classList.toggle("hidden", !state.split);
+    const button = $("btnSplitView");
+    button.setAttribute("aria-pressed", String(state.split));
+    button.title = state.split ? "Скрыть панель изменений" : "Показать панель изменений";
+    const label = button.querySelector("span");
+    if (label) label.textContent = state.split ? "1 панель" : "2 панели";
+    if (persist) {
+      try {
+        localStorage.setItem(SPLIT_KEY, state.split ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+    }
+    if (state.editor) state.editor.refresh();
+    if (state.split) renderEditorDiff();
+    else {
+      $("editorDiffBody").innerHTML = "";
+      $("editorDiffStat").textContent = "+0 / −0";
+    }
+  }
+
+  const DIFF_CONTEXT = 3;
+  const MAX_DIFF_ROWS = 4000;
+
+  function renderEditorDiff() {
+    if (!state.split) return;
+    const body = $("editorDiffBody");
+    const current = state.editor ? state.editor.getValue() : "";
+    const parts = window.Diff
+      ? Diff.diffLines(state.original || "", current)
+      : [{ value: current, added: true }];
+    const items = [];
+    let added = 0;
+    let removed = 0;
+    let oldLine = 0;
+    let newLine = 0;
+    for (const part of parts) {
+      const lines = part.value.replace(/\n$/, "").split("\n");
+      for (const text of lines) {
+        if (part.added) {
+          added += 1;
+          newLine += 1;
+          items.push({ kind: "add", text, line: oldLine });
+        } else if (part.removed) {
+          removed += 1;
+          oldLine += 1;
+          items.push({ kind: "del", text, line: oldLine });
+        } else {
+          oldLine += 1;
+          newLine += 1;
+          items.push({ kind: "ctx", text, line: oldLine });
+        }
+      }
+    }
+    const show = new Array(items.length).fill(false);
+    items.forEach((item, index) => {
+      if (item.kind === "ctx") return;
+      const from = Math.max(0, index - DIFF_CONTEXT);
+      const to = Math.min(items.length - 1, index + DIFF_CONTEXT);
+      for (let i = from; i <= to; i += 1) show[i] = true;
+    });
+
+    body.textContent = "";
+    $("editorDiffStat").textContent = `+${added} / −${removed}`;
+    if (added + removed === 0) {
+      const label = window.i18n ? window.i18n.tr("Изменений нет") : "Изменений нет";
+      body.append(emptyNode(label));
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    let rendered = 0;
+    let gap = false;
+    let truncated = false;
+    for (let index = 0; index < items.length; index += 1) {
+      if (!show[index]) {
+        gap = true;
+        continue;
+      }
+      if (rendered >= MAX_DIFF_ROWS) {
+        truncated = true;
+        break;
+      }
+      if (gap && rendered > 0) {
+        const separator = document.createElement("div");
+        separator.className = "ediff-gap";
+        separator.textContent = "⋯";
+        fragment.append(separator);
+      }
+      gap = false;
+      const item = items[index];
+      const row = document.createElement("div");
+      row.className = `ediff-row ${item.kind}`;
+      const num = document.createElement("span");
+      num.className = "ediff-num";
+      const cell = document.createElement("span");
+      cell.className = "ediff-cell";
+      num.textContent = item.kind === "add" ? "+" : String(item.line);
+      cell.textContent = item.text;
+      row.dataset.line = String(item.line);
+      row.append(num, cell);
+      fragment.append(row);
+      rendered += 1;
+    }
+    if (truncated) {
+      const more = document.createElement("div");
+      more.className = "ediff-gap";
+      more.textContent = `⋯ ${items.length} строк`;
+      fragment.append(more);
+    }
+    body.append(fragment);
+    syncEditorDiffScroll(true);
+  }
+
+  function syncEditorDiffScroll(force = false) {
+    if (!state.split || !state.editor) return;
+    const body = $("editorDiffBody");
+    const rows = body.querySelectorAll(".ediff-row");
+    if (!rows.length) return;
+    const viewport = state.editor.getViewport ? state.editor.getViewport() : null;
+    const line = viewport ? viewport.from : state.editor.lineAtHeight(state.editor.getScrollInfo().top, "window");
+    let target = null;
+    for (const row of rows) {
+      if (Number(row.dataset.line || 0) >= line) {
+        target = row;
+        break;
+      }
+    }
+    target = target || rows[rows.length - 1];
+    const top = target.offsetTop;
+    const view = body.clientHeight;
+    const outside = top < body.scrollTop + 12 || top > body.scrollTop + view - 40;
+    if (!outside && !force) return;
+    body.scrollTop = Math.max(0, top - view / 3);
   }
 
   // -------------------------------------------------------------------- diff
@@ -2267,6 +2423,7 @@
     $("btnTheme").addEventListener("click", toggleTheme);
     $("btnSave").addEventListener("click", saveFile);
     $("btnDiff").addEventListener("click", openDiff);
+    $("btnSplitView").addEventListener("click", () => setSplit(!state.split));
     $("diffTabLocal").addEventListener("click", () => setDiffTab("local"));
     $("diffTabHead").addEventListener("click", () => setDiffTab("head"));
     $("btnReload").addEventListener("click", async () => {
@@ -2447,6 +2604,7 @@
     applyTheme(localStorage.getItem(THEME_KEY) || "dark");
     bindModalDismiss();
     setupEditor();
+    setSplit(localStorage.getItem(SPLIT_KEY) === "1", { persist: false });
     bindEvents();
     loadRecents();
     try {

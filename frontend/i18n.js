@@ -423,6 +423,10 @@
     "Источник сравнения": "Comparison source",
     "Изменений нет — документ совпадает с открытой версией.": "No changes — the document matches the opened version.",
     "строк": "lines",
+    "2 панели": "2 panes",
+    "1 панель": "1 pane",
+    "Показать панель изменений": "Show the changes pane",
+    "Скрыть панель изменений": "Hide the changes pane",
     "Файл не входит в git-репозиторий.": "The file is not inside a git repository.",
     "age1…\nage1… (необязательно)": "age1…\nage1… (optional)",
   };
@@ -485,7 +489,7 @@
   const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "CODE", "PRE", "TEXTAREA", "INPUT", "SELECT"]);
   const ATTRS = ["placeholder", "title", "aria-label", "alt"];
 
-  const SKIP_CONTAINERS = ".CodeMirror, #secretsList, .diff-cols, .lang-switch";
+  const SKIP_CONTAINERS = ".CodeMirror, #secretsList, .diff-cols, .editor-diff-body, .lang-switch";
 
   function skip(node) {
     const element = node.nodeType === 1 ? node : node.parentElement;

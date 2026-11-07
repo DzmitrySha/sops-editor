@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/vendor/codemirror/codemirror.min.css">
   <link rel="stylesheet" href="/vendor/codemirror/addon/dialog/dialog.min.css">
   <link rel="stylesheet" href="/vendor/codemirror/addon/fold/foldgutter.min.css">
-  <link rel="stylesheet" href="/styles.css?v=18">
+  <link rel="stylesheet" href="/styles.css?v=20">
 </head>
 <body>
   <svg class="svg-defs" aria-hidden="true">
@@ -196,14 +196,24 @@
               <span class="validation" id="validation">—</span>
             </div>
             <div class="toolbar-right">
+              <button class="btn tiny ghost" id="btnSplitView" type="button" aria-pressed="false" title="Показать панель изменений"><svg><use href="#i-diff"/></svg><span>2 панели</span></button>
               <button class="btn tiny ghost hidden" id="btnRotateKeys" type="button" title="Ключи файла"><svg><use href="#i-key"/></svg><span>Ключи</span></button>
               <button class="btn tiny primary hidden" id="btnEncryptFile" type="button">Зашифровать</button>
               <button class="btn tiny ghost" id="btnReload" type="button"><svg><use href="#i-refresh"/></svg><span>Перезагрузить</span></button>
               <button class="btn tiny ghost" id="btnToggleSecrets" type="button" aria-pressed="true">Секреты <span class="count" id="secretCount">0</span></button>
             </div>
           </div>
-          <div class="editor-wrap">
-            <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+          <div class="editor-wrap" id="editorWrap">
+            <div class="editor-pane" id="editorPane">
+              <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+            </div>
+            <aside class="editor-diff hidden" id="editorDiff" aria-label="Изменения">
+              <div class="editor-diff-head">
+                <span>Изменения</span>
+                <span class="editor-diff-stat" id="editorDiffStat">+0 / −0</span>
+              </div>
+              <div class="editor-diff-body" id="editorDiffBody"></div>
+            </aside>
           </div>
           <div class="statusbar">
             <span id="statusCursor">Стр 1, стлб 1</span>
@@ -426,7 +436,7 @@
   <script src="/vendor/codemirror/addon/display/placeholder.min.js"></script>
   <script src="/vendor/js-yaml.min.js"></script>
   <script src="/vendor/diff.min.js"></script>
-  <script src="/i18n.js?v=11"></script>
-  <script src="/app.js?v=20"></script>
+  <script src="/i18n.js?v=12"></script>
+  <script src="/app.js?v=25"></script>
 </body>
 </html>
