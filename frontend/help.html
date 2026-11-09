@@ -86,7 +86,7 @@ creation_rules:
 sops --encrypt --age age1... --in-place secrets.yaml
 sops --decrypt secrets.yaml                     # проверить, что ключ подходит
 sops filestatus secrets.yaml                    # {"encrypted": true, ...}</code></pre>
-        <div class="doc-note warn"><p>Загружать в утилиту можно только файлы, которые уже являются SOPS-шифротекстом. Обычный YAML сервер отклонит с ошибкой «Файл не зашифрован SOPS».</p></div>
+        <div class="doc-note warn"><p>Обычный YAML/JSON/dotenv/INI тоже открывается в редакторе; кнопка «Зашифровать» создаёт SOPS-версию. Шифротекст с необычным именем (например, <code>.env_enc.test</code>) определяется по содержимому.</p></div>
       </section>
 
       <section class="doc-section" id="keys">
@@ -96,6 +96,7 @@ sops filestatus secrets.yaml                    # {"encrypted": true, ...}</code
           <thead><tr><th>Источник</th><th>Как задать</th><th>Область</th></tr></thead>
           <tbody>
             <tr><td>Ключ вкладки</td><td>Кнопка «Ключ» → вставить <code>AGE-SECRET-KEY-1…</code></td><td>Память процесса, TTL 8 ч, cookie вкладки</td></tr>
+            <tr><td>Зашифрованное хранилище</td><td>«Ключ» → «Серверный ключ» → вставить и обновить</td><td>Все пользователи; только замена, чтение невозможно</td></tr>
             <tr><td>Файл сервера</td><td><code>keys/age.txt</code> → <code>/keys/age.txt</code>, либо <code>SOPS_AGE_KEY_FILE</code></td><td>Все пользователи экземпляра</td></tr>
             <tr><td>Ключ по умолчанию</td><td><code>~/.config/sops/age/keys.txt</code></td><td>Пользователь контейнера</td></tr>
             <tr><td>Окружение</td><td><code>SOPS_AGE_KEY</code>, PGP/KMS/Vault-переменные</td><td>Процесс сервера</td></tr>
@@ -106,6 +107,9 @@ sops filestatus secrets.yaml                    # {"encrypted": true, ...}</code
 grep 'public key' keys/age.txt          # age1… — добавить в .sops.yaml
 # приватный ключ — только в keys/age.txt (монтируется read-only) или в env</code></pre>
         <p>В Docker каталог ключей монтируется read-only: <code>SOPS_EDITOR_KEYS=./keys</code>. Если файла нет, приложение стартует без серверного ключа и предложит ввести ключ в UI.</p>
+        <p><strong>Зашифрованное серверное хранилище</strong> пишется в <code>/data/server-key/keyring.json</code>; мастер-ключ Fernet задаётся через <code>SOPS_EDITOR_KEYSTORE_KEY</code>. Через UI ключ можно только заменить; отдаются лишь публичные получатели и отпечаток, endpoint для чтения приватного ключа отсутствует.</p>
+<pre><code>python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# значение — в docker/.env.secrets или в K8s/Docker secret</code></pre>
         <div class="doc-note"><p>Ключ, введённый в UI, живёт только в памяти процесса и не пишется на диск и в логи. Кнопка «Забыть ключ» удаляет его немедленно. Ключ вкладки приоритетнее серверного: пока он задан, серверный ключ не используется.</p></div>
       </section>
 
@@ -197,13 +201,14 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
         <table class="doc-table">
           <thead><tr><th>Кнопка</th><th>Что делает</th></tr></thead>
           <tbody>
-            <tr><td>Коммит</td><td><code>git add -- файл</code> + <code>git commit -- файл</code>; в коммит попадает только открытый файл. Галочка «запушить» делает push после коммита.</td></tr>
+            <tr><td>Коммит</td><td><code>git add -- файл</code> + <code>git commit -- файл</code>; в коммит попадает только открытый файл. Имя и email автора берутся из полей коммита и становятся также committer; email должен совпадать с GitLab. В сообщение добавляется <code>Made-with: SOPS Editor</code>. Галочка «запушить» делает push после коммита.</td></tr>
             <tr><td>↻ (pull)</td><td><code>git pull --ff-only</code>, только при чистом рабочем дереве. После pull файл перезагружается.</td></tr>
             <tr><td>Дифф с HEAD</td><td>Открывает окно «Изменения» сразу на вкладке «С HEAD»: сервер расшифровывает версию из <code>HEAD</code> и текущий файл, они показываются рядом в две колонки с номерами строк. Обе стороны расшифровываются в памяти сервера, в браузер уходит уже открытый текст, как и при обычном открытии файла.</td></tr>
-            <tr><td>Из git</td><td><code>git clone</code> в <code>/data/repos/&lt;имя&gt;</code>.</td></tr>
+            <tr><td>Из git</td><td><code>git clone</code> в <code>/data/repos/&lt;имя&gt;</code>; необязательная папка.</td></tr>
           </tbody>
         </table>
-        <p>Для приватных HTTPS-репозиториев задайте <code>SOPS_EDITOR_GIT_TOKEN</code> (GitLab: <code>oauth2</code>, GitHub: <code>x-access-token</code>); токен не передаётся из UI. Для SSH смонтируйте ключ или агент. Хосты клонирования можно ограничить через <code>SOPS_EDITOR_GIT_ALLOWED_HOSTS</code>.</p>
+        <p>Для приватных HTTPS-репозиториев задайте <code>SOPS_EDITOR_GIT_TOKEN</code> (GitLab: <code>oauth2</code>, GitHub: <code>x-access-token</code>); токен не передаётся из UI. Для SSH host <code>~/.ssh</code> монтируется read-only в <code>/ssh</code>, приватный ключ ищется автоматически (или задайте <code>SOPS_EDITOR_GIT_SSH_KEY</code>). Работают <code>git@host:group/repo.git</code> и <code>ssh://git@host:port/group/repo.git</code>. Хосты клонирования можно ограничить через <code>SOPS_EDITOR_GIT_ALLOWED_HOSTS</code>.</p>
+        <p>Если указать <strong>папку</strong> (например, <code>infra</code>), используется partial clone + sparse checkout: скачивается только она и корневые файлы вроде <code>.sops.yaml</code>, а не весь репозиторий.</p>
       </section>
 
       <section class="doc-section" id="auth">
@@ -322,6 +327,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
             <tr><td><code>GET /api/download?path=</code></td><td>Скачать зашифрованный загруженный файл.</td></tr>
             <tr><td><code>GET /api/backups?path=</code>, <code>GET /api/backups/{id}?path=</code></td><td>Список и скачивание резервных копий.</td></tr>
             <tr><td><code>POST/DELETE /api/session/key</code></td><td>Задать/забыть age-ключ вкладки.</td></tr>
+            <tr><td><code>GET/PUT /api/server-key</code></td><td>Метаданные / замена зашифрованного серверного ключа. Приватный ключ не отдаётся.</td></tr>
             <tr><td><code>GET /api/git?path=</code>, <code>POST /api/git/commit|push|pull|clone</code></td><td>Git-операции.</td></tr>
             <tr><td><code>GET /api/git/diff?path=&amp;op=</code></td><td>Расшифрованный файл и его версия из <code>HEAD</code> для сравнения рядом.</td></tr>
             <tr><td><code>POST /api/keys/rotate</code></td><td>Ротация ключей (JSON: path, mode = <code>updatekeys</code> | <code>rotate</code>). Долгая операция: поддержите <code>op=</code> и опрашивайте <code>/api/ops/{id}</code>.</td></tr>

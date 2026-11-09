@@ -33,6 +33,7 @@ from .errors import (
 )
 from .files import cleanup_uploads, read_bounded, write_atomic
 from .git_service import GitService
+from .key_store import KeyStore
 from .logging_setup import setup_logging
 from .ops import OperationRegistry
 from .security import PathGuard
@@ -53,16 +54,23 @@ class KeyRequest(BaseModel):
     key: str = Field(min_length=1, max_length=64 * 1024)
 
 
+class ServerKeyRequest(BaseModel):
+    key: str = Field(min_length=1, max_length=64 * 1024)
+
+
 class CommitRequest(BaseModel):
     path: str = Field(min_length=1, max_length=4096)
     message: str = Field(min_length=1, max_length=500)
     push: bool = False
+    author_name: str | None = Field(default=None, max_length=100)
+    author_email: str | None = Field(default=None, max_length=254)
 
 
 class CloneRequest(BaseModel):
     url: str = Field(min_length=1, max_length=2000)
     branch: str | None = Field(default=None, max_length=200)
     name: str | None = Field(default=None, max_length=80)
+    subdir: str | None = Field(default=None, max_length=500)
 
 
 class PushRequest(BaseModel):
@@ -203,11 +211,19 @@ def _ambient_key_source() -> str:
     return "none"
 
 
-def _key_material(request: Request, settings: Settings, sessions: SessionStore) -> KeyMaterial:
+def _key_material(
+    request: Request,
+    settings: Settings,
+    sessions: SessionStore,
+    key_store: KeyStore,
+) -> KeyMaterial:
     sid = _session_cookie(request, settings)
     session = sessions.get(sid)
     if session is not None:
         return KeyMaterial(label="session", inline=session.key)
+    stored = key_store.load_inline()
+    if stored is not None:
+        return KeyMaterial(label="server_store", inline=stored)
     key_file = settings.effective_age_key_file
     if key_file is not None:
         return KeyMaterial(label="server_file", file=key_file)
@@ -230,14 +246,19 @@ def _key_status(
     settings: Settings,
     sessions: SessionStore,
     sops: SopsRunner,
+    key_store: KeyStore,
 ) -> dict[str, Any]:
     sid = _session_cookie(request, settings)
     session = sessions.get(sid)
+    store_status = key_store.status()
     key_file = settings.effective_age_key_file
     ambient = _ambient_key_source()
     if session is not None:
         source = "session"
         recipients = session.recipients
+    elif store_status.get("configured"):
+        source = "server_store"
+        recipients = list(store_status.get("recipients") or [])
     elif key_file is not None:
         source = "server_file"
         recipients = sops.public_recipients_from_file(key_file)
@@ -255,6 +276,7 @@ def _key_status(
         "session": session is not None,
         "recipients": recipients,
         "server_key_file": str(key_file) if key_file is not None else None,
+        "server_store": store_status,
         "auth_enabled": settings.auth_enabled,
     }
 
@@ -285,11 +307,15 @@ def _default_recipients(
     settings: Settings,
     sessions: SessionStore,
     sops: SopsRunner,
+    key_store: KeyStore,
 ) -> list[str]:
     sid = _session_cookie(request, settings)
     session = sessions.get(sid)
     if session is not None:
         return list(session.recipients)
+    stored = key_store.recipients()
+    if stored:
+        return stored
     key_file = _server_key_file(settings)
     if key_file is not None:
         return sops.public_recipients_from_file(key_file)
@@ -375,6 +401,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     sessions = SessionStore(settings.session_ttl_seconds)
     ops = OperationRegistry()
     sops = SopsRunner(settings.sops_bin, settings.age_keygen_bin, settings.request_timeout)
+    key_store = KeyStore(settings, sops)
     git = GitService(settings)
     editor = EditorService(settings, guard, sops, git)
 
@@ -397,7 +424,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         if settings.auth_mode == "basic" and not settings.auth_enabled:
             logger.warning("HTTP Basic auth отключён: задайте SOPS_EDITOR_AUTH_PASSWORD")
-        if settings.effective_age_key_file is None and _ambient_key_source() == "none":
+        if key_store.configured and not key_store.available:
+            logger.warning(
+                "Найден зашифрованный серверный ключ, но SOPS_EDITOR_KEYSTORE_KEY не задан"
+            )
+        elif key_store.available:
+            logger.info(
+                "Зашифрованное хранилище серверного ключа включено (configured={})",
+                key_store.configured,
+            )
+        if (
+            not key_store.configured
+            and settings.effective_age_key_file is None
+            and _ambient_key_source() == "none"
+        ):
             logger.warning("Серверный age-ключ не найден: пользователь должен задать ключ в UI")
         try:
             logger.info("sops: {}", sops.version())
@@ -417,6 +457,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.guard = guard
     app.state.sessions = sessions
     app.state.sops = sops
+    app.state.key_store = key_store
     app.state.git = git
     app.state.editor = editor
 
@@ -638,16 +679,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 }
                 for root in settings.roots_list
             ],
-            "key": _key_status(request, settings, sessions, sops),
+            "key": _key_status(request, settings, sessions, sops, key_store),
             "allow_git_clone": settings.allow_git_clone,
             "git_token_configured": bool(settings.git_token and settings.git_token.get_secret_value()),
+            "git_ssh": git.ssh_status(),
+            "git_identity": git.default_identity(),
             "max_file_bytes": settings.max_file_bytes,
             "backup_keep": settings.backup_keep,
         }
 
     @app.get("/api/session")
     async def session_status(request: Request):
-        return _key_status(request, settings, sessions, sops)
+        return _key_status(request, settings, sessions, sops, key_store)
+
+    @app.get("/api/server-key")
+    async def server_key_status():
+        # Deliberately metadata only: the private key is never returned.
+        return key_store.status()
+
+    @app.put("/api/server-key")
+    async def update_server_key(body: ServerKeyRequest):
+        result = key_store.update(body.key)
+        return {"ok": True, **result}
 
     @app.post("/api/session/key")
     async def set_key(request: Request, body: KeyRequest):
@@ -672,7 +725,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         sid = _session_cookie(request, settings)
         if sid:
             sessions.delete(sid)
-        response = JSONResponse({"ok": True, "key": _key_status(request, settings, sessions, sops)})
+        response = JSONResponse({"ok": True, "key": _key_status(request, settings, sessions, sops, key_store)})
         response.delete_cookie("sops_sid", path="/")
         return response
 
@@ -744,7 +797,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if len(raw) > settings.max_file_bytes:
             raise PayloadTooLarge(f"Файл больше лимита {settings.max_file_bytes} байт")
         chosen = _clean_recipients(recipients) or _default_recipients(
-            request, settings, sessions, sops
+            request, settings, sessions, sops, key_store
         )
         if not chosen:
             raise BadRequest(
@@ -796,7 +849,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except SopsFailure as exc:
                 if exc.code != "no_creation_rule":
                     raise
-                fallback = _default_recipients(request, settings, sessions, sops)
+                fallback = _default_recipients(request, settings, sessions, sops, key_store)
                 logger.info("no creation rule for {}; fallback recipients={}", body.path, fallback)
                 if not fallback:
                     raise BadRequest(
@@ -818,7 +871,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/keys/rotate")
     def rotate_keys(request: Request, body: RotateRequest, op: str | None = None):
-        key = _key_material(request, settings, sessions)
+        key = _key_material(request, settings, sessions, key_store)
 
         def work(progress):
             result = editor.rotate_keys(body.path, body.mode, key, progress)
@@ -917,7 +970,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/file")
     async def open_file(request: Request, path: str):
-        key = _key_material(request, settings, sessions)
+        key = _key_material(request, settings, sessions, key_store)
         result = editor.open_file(path, key)
         logger.info(
             "Opened {} ({} bytes, format={}, key={})",
@@ -950,7 +1003,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/file/job")
     def open_file_job(request: Request, path: str, op: str | None = None):
-        key = _key_material(request, settings, sessions)
+        key = _key_material(request, settings, sessions, key_store)
 
         def work(progress):
             result = editor.open_file(path, key, progress)
@@ -967,7 +1020,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/file/job")
     def save_file_job(request: Request, body: SaveRequest, op: str | None = None):
-        key = _key_material(request, settings, sessions)
+        key = _key_material(request, settings, sessions, key_store)
 
         def work(progress):
             result = editor.save_file(
@@ -987,7 +1040,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/file/stream")
     async def open_file_stream(request: Request, path: str):
-        key = _key_material(request, settings, sessions)
+        key = _key_material(request, settings, sessions, key_store)
 
         def work(emit):
             result = editor.open_file(path, key, emit)
@@ -1004,7 +1057,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/file/stream")
     async def save_file_stream(request: Request, body: SaveRequest):
-        key = _key_material(request, settings, sessions)
+        key = _key_material(request, settings, sessions, key_store)
 
         def work(emit):
             result = editor.save_file(
@@ -1024,7 +1077,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/file")
     async def save_file(request: Request, body: SaveRequest):
-        key = _key_material(request, settings, sessions)
+        key = _key_material(request, settings, sessions, key_store)
         result = editor.save_file(
             body.path, body.content, body.format, body.expected_sha256, key
         )
@@ -1060,7 +1113,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/git/diff")
     def git_diff(request: Request, path: str, op: str | None = None):
-        key = _key_material(request, settings, sessions)
+        key = _key_material(request, settings, sessions, key_store)
 
         def work(progress):
             return editor.git_diff(path, key, progress)
@@ -1070,7 +1123,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/git/commit")
     async def git_commit(body: CommitRequest):
         resolved = guard.resolve_file(body.path)
-        result = git.commit(resolved, body.message, body.push)
+        result = git.commit(
+            resolved,
+            body.message,
+            body.push,
+            body.author_name,
+            body.author_email,
+        )
         logger.info("Git commit for {}: {}", resolved, result.get("hash"))
         return result
 
@@ -1086,8 +1145,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/git/clone")
     async def git_clone(body: CloneRequest):
-        result = git.clone(body.url, body.branch, body.name)
-        logger.info("Cloned {} -> {}", result.get("remote"), result.get("path"))
+        result = git.clone(body.url, body.branch, body.name, body.subdir)
+        logger.info(
+            "Cloned {} -> {} (subdir={})",
+            result.get("remote"),
+            result.get("path"),
+            result.get("subdir"),
+        )
         return result
 
     # ---------------------------------------------------------------- static

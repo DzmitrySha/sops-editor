@@ -103,14 +103,17 @@
             <div class="tab-panel hidden" id="tabGit">
               <div class="form-grid">
                 <label class="field-label" for="gitUrl">URL репозитория</label>
-                <input id="gitUrl" class="input mono" type="text" placeholder="https://git.example.net/group/secrets.git" autocomplete="off" spellcheck="false">
+                <input id="gitUrl" class="input mono" type="text" placeholder="git@gitlab.example.net:group/secrets.git" autocomplete="off" spellcheck="false">
                 <label class="field-label" for="gitBranch">Ветка <span class="muted">(необязательно)</span></label>
                 <input id="gitBranch" class="input mono" type="text" placeholder="main" autocomplete="off" spellcheck="false">
+                <label class="field-label" for="gitSubdir">Папка <span class="muted">(необязательно, sparse checkout)</span></label>
+                <input id="gitSubdir" class="input mono" type="text" placeholder="infra" autocomplete="off" spellcheck="false">
               </div>
               <div class="input-row">
                 <button class="btn primary" id="btnClone" type="button">Клонировать в /data/repos</button>
               </div>
-              <p class="hint">Для приватных HTTPS-репозиториев задайте <code>SOPS_EDITOR_GIT_TOKEN</code> на сервере. Для SSH смонтируйте ключ или агент. После клонирования откроется обзор каталога.</p>
+              <p class="hint">HTTPS: укажите <code>SOPS_EDITOR_GIT_TOKEN</code> на сервере. SSH: host <code>~/.ssh</code> монтируется в <code>/ssh</code>. Если указать папку, скачивается только она (плюс корневые файлы вроде <code>.sops.yaml</code>), а не весь репозиторий.</p>
+              <p class="hint" id="gitSshHint"></p>
             </div>
             <div class="tab-panel hidden" id="tabLocal">
               <div class="drop-zone" id="localDrop">
@@ -304,7 +307,18 @@
         <button class="btn ghost" id="btnForgetKey" type="button">Забыть ключ</button>
         <button class="btn primary" id="btnSaveKey" type="button">Сохранить в памяти</button>
       </div>
-      <p class="hint">Ключ хранится только в памяти процесса и привязан к cookie этой вкладки. Он не пишется на диск и не попадает в логи. Ключ вкладки имеет приоритет над серверным, поэтому после его ввода файлы, зашифрованные только на серверный ключ, перестанут открываться — нажмите «Забыть ключ», чтобы вернуться к серверному. Для постоянного ключа смонтируйте <code>/keys/age.txt</code>.</p>
+      <p class="hint">Ключ хранится только в памяти процесса и привязан к cookie этой вкладки. Он не пишется на диск и не попадает в логи. Ключ вкладки имеет приоритет над серверным, поэтому после его ввода файлы, зашифрованные только на серверный ключ, перестанут открываться — нажмите «Забыть ключ», чтобы вернуться к серверному.</p>
+      <hr>
+      <details class="server-key-block">
+        <summary><strong>Серверный ключ (зашифрованное хранилище)</strong></summary>
+        <div class="key-current" id="serverKeyStatus"></div>
+        <label class="field-label" for="serverKeyInput">Новый ключ <code>AGE-SECRET-KEY-1…</code></label>
+        <textarea class="input mono textarea" id="serverKeyInput" rows="3" placeholder="AGE-SECRET-KEY-1…&#10;…" spellcheck="false"></textarea>
+        <div class="input-row">
+          <button class="btn primary" id="btnSaveServerKey" type="button">Обновить серверный ключ</button>
+        </div>
+        <p class="hint">Ключ можно только заменить, прочитать его нельзя. Он хранится зашифрованным в <code>/data/server-key</code>; мастер-ключ задаётся секретом <code>SOPS_EDITOR_KEYSTORE_KEY</code>. При активном ключе вкладки сначала нажмите «Забыть ключ».</p>
+      </details>
       <p class="hint warn">Открывайте утилиту по HTTPS или на localhost: ключ и открытый текст идут по сети.</p>
     </div>
   </div>
@@ -318,8 +332,14 @@
       </div>
       <label class="field-label" for="commitMessage">Сообщение</label>
       <input class="input" id="commitMessage" type="text" maxlength="500" autocomplete="off">
+      <div class="form-grid">
+        <label class="field-label" for="commitAuthorName">Автор коммита (GitLab)</label>
+        <input class="input" id="commitAuthorName" type="text" maxlength="100" autocomplete="name" placeholder="Имя Фамилия">
+        <label class="field-label" for="commitAuthorEmail">Email в GitLab</label>
+        <input class="input" id="commitAuthorEmail" type="email" maxlength="254" autocomplete="email" placeholder="user@company.example">
+      </div>
       <label class="check"><input type="checkbox" id="commitPush"> запушить после коммита</label>
-      <p class="hint">Уйдёт только этот файл. Если push требует учётных данных, настройте токен/SSH на сервере.</p>
+      <p class="hint">Автор и committer будут этой личностью; email должен совпадать с подтверждённым email в GitLab. В сообщение автоматически добавляется трейлер <code>Made-with: SOPS Editor</code>. Уйдёт только этот файл.</p>
       <div class="modal-actions">
         <button class="btn ghost" data-close="commitModal" type="button">Отмена</button>
         <button class="btn primary" id="btnCommitRun" type="button">Закоммитить</button>

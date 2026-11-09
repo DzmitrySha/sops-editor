@@ -29,7 +29,7 @@ if not exist "docker\.env.secrets" (
   echo Created docker\.env.secrets
 )
 
-for %%V in (SOPS_EDITOR_WORKSPACE SOPS_EDITOR_KEYS SOPS_EDITOR_DATA SOPS_EDITOR_BIND SOPS_EDITOR_PORT SOPS_EDITOR_IMAGE) do (
+for %%V in (SOPS_EDITOR_WORKSPACE SOPS_EDITOR_KEYS SOPS_EDITOR_DATA SOPS_EDITOR_BIND SOPS_EDITOR_PORT SOPS_EDITOR_IMAGE SOPS_EDITOR_HOST_SSH_DIR SOPS_EDITOR_HOST_GITCONFIG) do (
   if not defined %%V (
     for /f "usebackq tokens=1,* delims==" %%A in (`findstr /b /c:"%%V=" "docker\.env" 2^>nul`) do set "%%V=%%B"
   )
@@ -54,6 +54,10 @@ if not defined SOPS_EDITOR_KEYS set "SOPS_EDITOR_KEYS=%CD%/keys"
 if not defined SOPS_EDITOR_DATA set "SOPS_EDITOR_DATA=%CD%/storage"
 if not defined SOPS_EDITOR_BIND set "SOPS_EDITOR_BIND=127.0.0.1"
 if not defined SOPS_EDITOR_PORT set "SOPS_EDITOR_PORT=8787"
+if not defined SOPS_EDITOR_HOST_SSH_DIR if exist "%USERPROFILE%\.ssh" set "SOPS_EDITOR_HOST_SSH_DIR=%USERPROFILE%\.ssh"
+if defined SOPS_EDITOR_HOST_SSH_DIR set "SOPS_EDITOR_HOST_SSH_DIR=%SOPS_EDITOR_HOST_SSH_DIR:\=/%"
+if not defined SOPS_EDITOR_HOST_GITCONFIG if exist "%USERPROFILE%\.gitconfig" set "SOPS_EDITOR_HOST_GITCONFIG=%USERPROFILE%\.gitconfig"
+if defined SOPS_EDITOR_HOST_GITCONFIG set "SOPS_EDITOR_HOST_GITCONFIG=%SOPS_EDITOR_HOST_GITCONFIG:\=/%"
 set "SOPS_EDITOR_KEYS=%SOPS_EDITOR_KEYS:\=/%"
 set "SOPS_EDITOR_DATA=%SOPS_EDITOR_DATA:\=/%"
 
@@ -63,6 +67,12 @@ if "%PORT%"=="" set "PORT=8787"
 echo.
 echo Workspace: %SOPS_EDITOR_WORKSPACE%
 echo Key dir  : %SOPS_EDITOR_KEYS%  (optional: age.txt)
+if defined SOPS_EDITOR_HOST_SSH_DIR (
+  echo SSH dir  : %SOPS_EDITOR_HOST_SSH_DIR%
+) else (
+  echo SSH dir  : not set ^(HTTPS token only^)
+)
+if defined SOPS_EDITOR_HOST_GITCONFIG echo Git config: %SOPS_EDITOR_HOST_GITCONFIG%
 echo URL      : http://localhost:%PORT%
 echo.
 echo First build can take a few minutes...

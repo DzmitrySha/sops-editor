@@ -39,6 +39,17 @@ services:
       - "${SOPS_EDITOR_WORKSPACE:-./workspace}:/workspace"
       - "${SOPS_EDITOR_KEYS:-./keys}:/keys:ro"
       - "${SOPS_EDITOR_DATA:-./storage}:/data"
+      # Host ~/.ssh for SSH git. Read-only; private keys are copied to a
+      # private temp file with 0600 before use. Default is an empty dir.
+      - type: bind
+        source: ${SOPS_EDITOR_HOST_SSH_DIR:-./.ssh-host}
+        target: /ssh
+        read_only: true
+      # Host ~/.gitconfig is read only for author/committer prefill in the UI.
+      - type: bind
+        source: ${SOPS_EDITOR_HOST_GITCONFIG:-./.gitconfig-host}
+        target: /gitconfig
+        read_only: true
     read_only: true
     tmpfs:
       - /tmp:size=256m,mode=1777

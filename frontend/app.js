@@ -7,11 +7,13 @@
   const THEME_KEY = "sops-editor-theme";
   const REVEAL_KEY = "sops-editor-reveal";
   const SPLIT_KEY = "sops-editor-split";
+  const COMMIT_IDENTITY_KEY = "sops-editor-commit-identity-v1";
   const MAX_SECRET_ROWS = 800;
 
   const state = {
     status: null,
     key: null,
+    serverKey: null,
     file: null,
     original: "",
     eol: "\n",
@@ -483,10 +485,15 @@
 
   // --------------------------------------------------------------- status/key
   async function loadStatus() {
-    const status = await api("/api/status");
+    const [status, serverKey] = await Promise.all([
+      api("/api/status"),
+      api("/api/server-key"),
+    ]);
     state.status = status;
     state.key = status.key;
+    state.serverKey = serverKey;
     renderStatus();
+    renderServerKey();
     renderRecent();
   }
 
@@ -529,6 +536,7 @@
       session: "ключ в сессии",
       server_file: "ключ сервера",
       server_default: "ключ по умолчанию",
+      server_store: "ключ сервера (зашифрован)",
       environment: "ключ из окружения",
       none: "ключ не задан",
     };
@@ -577,6 +585,14 @@
     if (!status.roots.length) {
       rootLinks.innerHTML = '<span class="hint">Каталоги не заданы: SOPS_EDITOR_ROOTS.</span>';
     }
+    const sshHint = $("gitSshHint");
+    if (sshHint) {
+      const ssh = status.git_ssh || {};
+      sshHint.textContent = ssh.ready
+        ? `SSH: ${ssh.source === "agent" ? "ssh-agent" : (ssh.source || "ключ найден")}`
+        : "SSH: приватный ключ не найден в /ssh (для HTTPS не требуется).";
+      sshHint.className = `hint ${ssh.ready ? "" : "warn"}`.trim();
+    }
     renderKeyChip();
     updateActionButtons();
   }
@@ -588,11 +604,75 @@
       session: "ключ в сессии",
       server_file: "ключ сервера",
       server_default: "ключ по умолчанию",
+      server_store: "ключ сервера (зашифрован)",
       environment: "ключ из окружения",
       none: "ключ не задан",
     };
     $("keyChip").textContent = labels[source] || source;
     $("keyChip").className = `chip ${source === "none" ? "bad" : "ok"}`;
+  }
+
+  function renderServerKey() {
+    const holder = $("serverKeyStatus");
+    if (!holder) return;
+    const info = state.serverKey;
+    const parts = [];
+    if (!info) {
+      parts.push("<p>Статус хранилища неизвестен.</p>");
+    } else if (!info.available) {
+      parts.push(
+        info.configured
+          ? "<p><strong>Ключ найден, но мастер-ключ не задан.</strong> Добавьте <code>SOPS_EDITOR_KEYSTORE_KEY</code> в секреты сервера.</p>"
+          : "<p><strong>Хранилище выключено.</strong> Задайте <code>SOPS_EDITOR_KEYSTORE_KEY</code> в секретах сервера, чтобы включать обновление серверного ключа.</p>"
+      );
+    } else if (info.configured) {
+      const recipients = (info.recipients || []).join(", ") || "—";
+      parts.push("<p><strong>Ключ настроен.</strong> Хранится зашифрованным; прочитать его нельзя.</p>");
+      parts.push(`<p class="small">Получатели: <span class="mono">${escapeHtml(recipients)}</span></p>`);
+      if (info.fingerprint) {
+        parts.push(`<p class="small">Отпечаток: <span class="mono">${escapeHtml(info.fingerprint)}</span></p>`);
+      }
+      if (info.updated_at) {
+        parts.push(`<p class="small">Обновлён: ${escapeHtml(info.updated_at)}</p>`);
+      }
+    } else {
+      parts.push("<p><strong>Ключ не задан.</strong> Вставьте приватный age-ключ и обновите хранилище.</p>");
+    }
+    if (info && info.error) {
+      parts.push(`<p class="hint warn">${escapeHtml(info.error)}</p>`);
+    }
+    holder.innerHTML = parts.join("");
+    const input = $("serverKeyInput");
+    const button = $("btnSaveServerKey");
+    if (input) input.disabled = !(info && info.available);
+    if (button) button.disabled = !(info && info.available);
+  }
+
+  async function saveServerKey() {
+    const value = $("serverKeyInput").value.trim();
+    if (!value) {
+      toast("Серверный ключ", "Вставьте AGE-SECRET-KEY-1…", "warn");
+      return;
+    }
+    $("btnSaveServerKey").disabled = true;
+    try {
+      const result = await api("/api/server-key", { method: "PUT", body: { key: value } });
+      state.serverKey = result;
+      state.key = await api("/api/session");
+      $("serverKeyInput").value = "";
+      renderServerKey();
+      renderKeyChip();
+      renderStatus();
+      toast(
+        "Серверный ключ обновлён",
+        `Получатели: ${(result.recipients || []).join(", ") || "—"}. Ключ сохранён зашифрованным.`,
+        "ok"
+      );
+    } catch (error) {
+      toast("Серверный ключ не обновлён", error.message, "bad");
+    } finally {
+      $("btnSaveServerKey").disabled = !(state.serverKey && state.serverKey.available);
+    }
   }
 
   async function refreshKeyStatus() {
@@ -1751,10 +1831,34 @@
     holder.append(branch, status, commit);
   }
 
+  function readCommitIdentity() {
+    try {
+      const value = JSON.parse(localStorage.getItem(COMMIT_IDENTITY_KEY) || "{}");
+      return {
+        name: typeof value.name === "string" ? value.name : "",
+        email: typeof value.email === "string" ? value.email : "",
+      };
+    } catch {
+      return { name: "", email: "" };
+    }
+  }
+
+  function saveCommitIdentity(name, email) {
+    try {
+      localStorage.setItem(COMMIT_IDENTITY_KEY, JSON.stringify({ name, email }));
+    } catch {
+      // localStorage can be disabled; the commit itself still works.
+    }
+  }
+
   function openCommitModal() {
     if (!state.file || !state.file.git) return;
     $("commitBranch").textContent = state.file.git.branch || "git";
     $("commitMessage").value = `chore(secrets): update ${state.file.name}`;
+    const saved = readCommitIdentity();
+    const detected = (state.status && state.status.git_identity) || {};
+    $("commitAuthorName").value = saved.name || detected.name || "";
+    $("commitAuthorEmail").value = saved.email || detected.email || "";
     $("commitPush").checked = false;
     openModal("commitModal");
     setTimeout(() => $("commitMessage").select(), 30);
@@ -1764,6 +1868,12 @@
     if (!state.file) return;
     const message = $("commitMessage").value.trim();
     if (!message) { toast("Коммит", "Введите сообщение", "warn"); return; }
+    const authorName = $("commitAuthorName").value.trim();
+    const authorEmail = $("commitAuthorEmail").value.trim();
+    if (!authorName || !authorEmail) {
+      toast("Коммит", "Укажите имя и email из GitLab, чтобы коммит был от вас.", "warn");
+      return;
+    }
     const push = $("commitPush").checked;
     state.busy = true;
     $("btnCommitRun").disabled = true;
@@ -1771,8 +1881,15 @@
     try {
       const result = await api("/api/git/commit", {
         method: "POST",
-        body: { path: state.file.path, message, push },
+        body: {
+          path: state.file.path,
+          message,
+          push,
+          author_name: authorName,
+          author_email: authorEmail,
+        },
       });
+      saveCommitIdentity(authorName, authorEmail);
       closeModal("commitModal");
       if (!result.committed) {
         toast("Коммит не нужен", "Нет изменений в индексе.", "warn");
@@ -2333,6 +2450,7 @@
   // --------------------------------------------------------------------- key
   function openKeyModal(reason) {
     renderKeyModal(reason);
+    renderServerKey();
     openModal("keyModal");
   }
 
@@ -2362,6 +2480,8 @@
       parts.push(`<p><strong>Ключ в сессии.</strong> Получатели: ${escapeHtml((key.recipients || []).join(", ") || "—")}</p>`);
     } else if (key.source === "server_file" || key.source === "server_default") {
       parts.push(`<p><strong>Используется серверный ключ.</strong> ${escapeHtml(key.server_key_file || "~/.config/sops/age/keys.txt")}</p>`);
+    } else if (key.source === "server_store") {
+      parts.push("<p><strong>Используется серверный ключ из зашифрованного хранилища.</strong> Прочитать его через интерфейс нельзя.</p>");
     } else if (key.source === "environment") {
       parts.push("<p><strong>Ключ из окружения сервера.</strong> Можно дополнительно задать ключ для этой вкладки.</p>");
     } else {
@@ -2431,11 +2551,12 @@
       return;
     }
     const branch = $("gitBranch").value.trim() || null;
+    const subdir = $("gitSubdir").value.trim() || null;
     $("btnClone").disabled = true;
     try {
       const result = await api("/api/git/clone", {
         method: "POST",
-        body: { url, branch },
+        body: { url, branch, subdir },
       });
       toast("Репозиторий склонирован", result.path, "ok");
       openPicker(result.path);
@@ -2495,6 +2616,7 @@
     $("btnBackups").addEventListener("click", openBackupsModal);
     $("btnKeyOpen").addEventListener("click", () => openKeyModal());
     $("btnSaveKey").addEventListener("click", saveKey);
+    $("btnSaveServerKey").addEventListener("click", saveServerKey);
     $("btnForgetKey").addEventListener("click", forgetKey);
     $("keyFile").addEventListener("change", async (event) => {
       const file = event.target.files && event.target.files[0];
@@ -2516,6 +2638,9 @@
     });
     $("btnClone").addEventListener("click", cloneRepo);
     $("gitUrl").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") cloneRepo();
+    });
+    $("gitSubdir").addEventListener("keydown", (event) => {
       if (event.key === "Enter") cloneRepo();
     });
     $("btnLocalPick").addEventListener("click", pickLocalFile);

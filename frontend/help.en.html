@@ -95,6 +95,7 @@ sops filestatus secrets.yaml                    # {"encrypted": true, ...}</code
           <thead><tr><th>Source</th><th>How to set</th><th>Scope</th></tr></thead>
           <tbody>
             <tr><td>Tab key</td><td>“Key” button → paste <code>AGE-SECRET-KEY-1…</code></td><td>Process memory, TTL 8 h, tab cookie</td></tr>
+            <tr><td>Encrypted server store</td><td>“Key” → “Server key” → paste and update</td><td>All users; replace only, reading is impossible</td></tr>
             <tr><td>Server file</td><td><code>keys/age.txt</code> → <code>/keys/age.txt</code>, or <code>SOPS_AGE_KEY_FILE</code></td><td>All users of the instance</td></tr>
             <tr><td>Default key</td><td><code>~/.config/sops/age/keys.txt</code></td><td>Container user</td></tr>
             <tr><td>Environment</td><td><code>SOPS_AGE_KEY</code>, PGP/KMS/Vault variables</td><td>Server process</td></tr>
@@ -105,6 +106,9 @@ sops filestatus secrets.yaml                    # {"encrypted": true, ...}</code
 grep 'public key' keys/age.txt          # age1… — add it to .sops.yaml
 # private key — only in keys/age.txt (mounted read-only) or in env</code></pre>
         <p>In Docker the keys directory is mounted read-only: <code>SOPS_EDITOR_KEYS=./keys</code>. If the file is missing, the app starts without a server key and offers to enter one in the UI.</p>
+        <p>The <strong>encrypted server store</strong> is written to <code>/data/server-key/keyring.json</code> with a Fernet master key from <code>SOPS_EDITOR_KEYSTORE_KEY</code>. The UI can only replace the key and show its public recipients/fingerprint; there is no endpoint that returns the private key. Generate the master key once:</p>
+<pre><code>python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# put the value into docker/.env.secrets or a K8s/Docker secret</code></pre>
         <div class="doc-note"><p>A key entered in the UI lives only in process memory and is never written to disk or logs. “Forget key” removes it immediately. The tab key takes precedence over the server key: while it is set, the server key is not used.</p></div>
       </section>
 
@@ -189,13 +193,14 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
         <table class="doc-table">
           <thead><tr><th>Button</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td>Commit</td><td><code>git add -- file</code> + <code>git commit -- file</code>; only the open file is committed. The “push” checkbox pushes after the commit.</td></tr>
+            <tr><td>Commit</td><td><code>git add -- file</code> + <code>git commit -- file</code>; only the open file is committed. The name/email fields set both author and committer and must match a verified GitLab email. <code>Made-with: SOPS Editor</code> is appended to the message. The “push” checkbox pushes after the commit.</td></tr>
             <tr><td>↻ (pull)</td><td><code>git pull --ff-only</code>, only with a clean worktree. The file is reloaded after the pull.</td></tr>
             <tr><td>Diff with HEAD</td><td>Opens the “Changes” window straight on the “With HEAD” tab: the server decrypts the <code>HEAD</code> version and the current file, and they are shown side by side in two columns with line numbers. Both sides are decrypted in the server process; the browser receives plaintext, exactly as when opening the file.</td></tr>
-            <tr><td>From git</td><td><code>git clone</code> into <code>/data/repos/&lt;name&gt;</code>.</td></tr>
+            <tr><td>From git</td><td><code>git clone</code> into <code>/data/repos/&lt;name&gt;</code>; optional subfolder.</td></tr>
           </tbody>
         </table>
-        <p>For private HTTPS repositories set <code>SOPS_EDITOR_GIT_TOKEN</code> (GitLab: <code>oauth2</code>, GitHub: <code>x-access-token</code>); the token never comes from the UI. For SSH mount a key or an agent. Clone hosts can be restricted with <code>SOPS_EDITOR_GIT_ALLOWED_HOSTS</code>.</p>
+        <p>For private HTTPS repositories set <code>SOPS_EDITOR_GIT_TOKEN</code> (GitLab: <code>oauth2</code>, GitHub: <code>x-access-token</code>); the token never comes from the UI. For SSH, host <code>~/.ssh</code> is mounted read-only at <code>/ssh</code> and a private key is auto-detected (or set <code>SOPS_EDITOR_GIT_SSH_KEY</code>). Both <code>git@host:group/repo.git</code> and <code>ssh://git@host:port/group/repo.git</code> work. Clone hosts can be restricted with <code>SOPS_EDITOR_GIT_ALLOWED_HOSTS</code>.</p>
+        <p>If a <strong>folder</strong> is given (e.g. <code>infra</code>), the server uses partial clone + sparse checkout: only that folder and root files such as <code>.sops.yaml</code> are downloaded, not the whole repository.</p>
       </section>
 
       <section class="doc-section" id="auth">
@@ -315,6 +320,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
             <tr><td><code>GET /api/download?path=</code></td><td>Download an uploaded file.</td></tr>
             <tr><td><code>GET /api/backups?path=</code>, <code>GET /api/backups/{id}?path=</code></td><td>List and download backups.</td></tr>
             <tr><td><code>POST/DELETE /api/session/key</code></td><td>Set/forget the tab age key.</td></tr>
+            <tr><td><code>GET/PUT /api/server-key</code></td><td>Metadata / replace the encrypted server key. No endpoint returns the private key.</td></tr>
             <tr><td><code>GET /api/git?path=</code>, <code>POST /api/git/commit|push|pull|clone</code></td><td>Git operations.</td></tr>
             <tr><td><code>GET /api/git/diff?path=&amp;op=</code></td><td>The decrypted current file and its <code>HEAD</code> version, for a side-by-side comparison.</td></tr>
             <tr><td><code>POST /api/keys/rotate</code></td><td>Key rotation (JSON: path, mode = <code>updatekeys</code> | <code>rotate</code>). Long operation: pass <code>op=</code> and poll <code>/api/ops/{id}</code>.</td></tr>

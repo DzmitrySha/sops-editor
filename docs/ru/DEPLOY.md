@@ -124,7 +124,10 @@ curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status | grep ali
 - Bind-mount `workspace` должен быть доступен на запись пользователю, от которого запускается контейнер. В Linux это обычно root (compose по умолчанию), либо задайте `user:` и владельца каталога.
 - `/keys` монтируется read-only. Файл `age.txt` должен быть читаем контейнеру.
 - Git-репозиторий в `/workspace` должен иметь настроенные `user.name/email`; иначе сервер подставит `SOPS_EDITOR_GIT_AUTHOR_NAME/EMAIL`.
-- Для SSH-git смонтируйте ключ/agent и `known_hosts`; для HTTPS — `SOPS_EDITOR_GIT_TOKEN`.
+- Автор коммита: смонтируйте host `~/.gitconfig` read-only в `/gitconfig` (`SOPS_EDITOR_HOST_GITCONFIG=$HOME/.gitconfig`), чтобы поля имени/email предзаполнялись. Пользователь может их изменить; email должен совпадать с подтверждённым email в GitLab. В сообщение добавляется `Made-with: SOPS Editor`.
+- Git-SSH: задайте `SOPS_EDITOR_HOST_SSH_DIR=$HOME/.ssh` (Compose монтирует каталог read-only в `/ssh`). Приватный `id_ed25519`/`id_ecdsa`/`id_rsa` находится автоматически; можно указать `SOPS_EDITOR_GIT_SSH_KEY=/ssh/<ключ>`. На время операции ключ копируется в файл `0600`; `known_hosts` копируется в `/data/ssh/known_hosts`. Для agent пробросьте `SSH_AUTH_SOCK` в контейнер. Для HTTPS — `SOPS_EDITOR_GIT_TOKEN`.
+- Sparse-клон: необязательное поле «Папка» запускает `git clone --filter=blob:none --sparse` и оставляет только эту папку и корневые файлы вроде `.sops.yaml`.
+- Зашифрованный серверный ключ: хранилище `/data/server-key/keyring.json`, мастер-ключ `SOPS_EDITOR_KEYSTORE_KEY` (Fernet). UI может только заменить ключ; API не отдаёт приватный ключ. Мастер-ключ генерируется один раз и хранится с секретами деплоя: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Без него хранилище выключено, но `/keys/age.txt` продолжает работать.
 
 ## Обновление
 

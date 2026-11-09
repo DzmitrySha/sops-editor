@@ -140,8 +140,23 @@ curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status | grep ali
 - `/keys` is mounted read-only. `age.txt` must be readable by the container.
 - The git repository in `/workspace` should have `user.name/email` configured;
   otherwise the server falls back to `SOPS_EDITOR_GIT_AUTHOR_NAME/EMAIL`.
-- For SSH git, mount the key/agent and `known_hosts`; for HTTPS use
-  `SOPS_EDITOR_GIT_TOKEN`.
+- Commit identity: mount host `~/.gitconfig` read-only as `/gitconfig`
+  (`SOPS_EDITOR_HOST_GITCONFIG=$HOME/.gitconfig`) to prefill the author name/email
+  in the UI. The user can edit both fields; email must match a verified GitLab
+  email. The app appends `Made-with: SOPS Editor` to the commit message.
+- Git SSH: set `SOPS_EDITOR_HOST_SSH_DIR=$HOME/.ssh` (Compose mounts it
+  read-only at `/ssh`). A private `id_ed25519`/`id_ecdsa`/`id_rsa` is
+  auto-detected; override with `SOPS_EDITOR_GIT_SSH_KEY=/ssh/<key>`. The key is
+  copied to a `0600` temp file per operation; `known_hosts` is copied to
+  `/data/ssh/known_hosts`. For an agent, pass `SSH_AUTH_SOCK` into the container.
+  For HTTPS use `SOPS_EDITOR_GIT_TOKEN`.
+- Sparse clone: the optional “folder” field runs `git clone --filter=blob:none
+  --sparse` and checks out only that folder plus root files such as `.sops.yaml`.
+- Encrypted server key: store is `/data/server-key/keyring.json`, master key is
+  `SOPS_EDITOR_KEYSTORE_KEY` (Fernet). The UI can only replace it; no API returns
+  the private key. Generate the master key once and keep it with deployment secrets:
+  `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+  Without it the store is disabled, but `/keys/age.txt` still works.
 
 ## Updating
 

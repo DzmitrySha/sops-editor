@@ -64,6 +64,53 @@ def test_git_status_commit_and_push_rejection(client, workspace):
     assert second.json()["reason"] == "no_changes"
 
 
+def test_commit_uses_user_identity_and_adds_tool_trailer(client, workspace):
+    root = workspace["root"]
+    git(root, "init", "-b", "main")
+    git(root, "config", "user.name", "Tester")
+    git(root, "config", "user.email", "tester@example.com")
+    git(root, "add", ".")
+    git(root, "commit", "-m", "initial")
+
+    opened = client.get("/api/file", params={"path": str(workspace["target"])}).json()
+    edited = opened["content"].replace("hunter2", "hunter5")
+    saved = client.post(
+        "/api/file",
+        json={
+            "path": str(workspace["target"]),
+            "content": edited,
+            "format": "yaml",
+            "expected_sha256": opened["sha256"],
+        },
+    )
+    assert saved.status_code == 200, saved.text
+
+    response = client.post(
+        "/api/git/commit",
+        json={
+            "path": str(workspace["target"]),
+            "message": "rotate demo secret",
+            "push": False,
+            "author_name": "Дмитрий Шаповалов",
+            "author_email": "d.shapovalov@example.net",
+        },
+    )
+    assert response.status_code == 200, response.text
+    raw = git(
+        root,
+        "log",
+        "-1",
+        "--format=%an%x00%ae%x00%cn%x00%ce%x00%B",
+    )
+    parts = raw.split("\x00")
+    assert parts[0] == "Дмитрий Шаповалов"
+    assert parts[1] == "d.shapovalov@example.net"
+    assert parts[2] == "Дмитрий Шаповалов"
+    assert parts[3] == "d.shapovalov@example.net"
+    assert parts[4].startswith("rotate demo secret")
+    assert "Made-with: SOPS Editor" in parts[4]
+
+
 def test_git_clone_is_disabled_by_default(client):
     response = client.post(
         "/api/git/clone",

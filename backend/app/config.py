@@ -63,6 +63,26 @@ class Settings(BaseSettings):
     git_allowed_hosts: str = ""
     git_author_name: str = "SOPS Editor"
     git_author_email: str = "sops-editor@localhost"
+    # Optional host ~/.gitconfig mounted read-only for author/committer prefill.
+    git_config_global: str = "/gitconfig"
+
+    # SSH git. ``/ssh`` is the read-only mount of the host's ~/.ssh.
+    # A private key is auto-detected there unless git_ssh_key is set.
+    git_ssh_dir: str = "/ssh"
+    git_ssh_key: str = ""
+    git_ssh_known_hosts: str = ""
+    git_ssh_strict_host_key_checking: str = Field(
+        default="accept-new", pattern="^(yes|no|accept-new)$"
+    )
+
+    # Master key for the encrypted, write-only server key store. Generate with:
+    # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    key_store_secret: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "SOPS_EDITOR_KEYSTORE_KEY", "SOPS_EDITOR_KEYSTORE_SECRET"
+        ),
+    )
 
     @property
     def roots_list(self) -> list[Path]:

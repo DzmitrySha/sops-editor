@@ -11,6 +11,8 @@ keys/*
 workspace/*
 !workspace/examples/
 storage/
+.ssh-host/
+.gitconfig-host/
 *.log
 logs/
 backups/
@@ -41,3 +43,6 @@ desktop.ini
 .idea/
 .vscode/
 *.swp
+
+# local backup archives
+sops_ed_it.part*.rar
