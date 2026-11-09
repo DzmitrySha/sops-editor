@@ -10,7 +10,7 @@ Open a file from a git checkout, a cloned repository or your own computer — it
 <a href="https://github.com/DzmitrySha/sops-editor/actions/workflows/ci.yml"><img src="https://github.com/DzmitrySha/sops-editor/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
 <a href="../LICENSE"><img src="https://img.shields.io/badge/license-MIT-2dd4bf?style=flat-square" alt="License: MIT"></a>
 <a href="../backend/pyproject.toml"><img src="https://img.shields.io/badge/python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+"></a>
-<img src="https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
+<img src="https://img.shields.io/badge/FastAPI-0.162-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
 <img src="https://img.shields.io/badge/SOPS-3.13-8a2be2?style=flat-square" alt="SOPS 3.13">
 <img src="https://img.shields.io/badge/age-1.3-00b3a4?style=flat-square" alt="age 1.3">
 <img src="https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
@@ -33,8 +33,8 @@ Open a file from a git checkout, a cloned repository or your own computer — it
 
 | Dark | Light |
 |---|---|
-| ![Editor, dark theme](../docs/screenshots/home-dark.png) | ![Editor, light theme](../docs/screenshots/home-light.png) |
-| ![Encrypted file open in the editor](../docs/screenshots/editor-dark.png) | ![Built-in documentation](../docs/screenshots/help-dark.png) |
+| ![Editor, dark theme](../docs/screenshots/en/home-dark.png) | ![Editor, light theme](../docs/screenshots/en/home-light.png) |
+| ![File open in the editor](../docs/screenshots/en/editor-dark.png) | ![Built-in documentation](../docs/screenshots/en/help-dark.png) |
 
 ## Contents
 
@@ -63,10 +63,10 @@ Open a file from a git checkout, a cloned repository or your own computer — it
 | **Verified writes** | Before saving, the file's SHA-256 is compared with what the browser saw (protection against clobbering someone else's edit). After saving, the result is decrypted again and compared with the submitted data; on mismatch the original is restored. |
 | **Plain files too** | A plain YAML / JSON / dotenv / INI file opens without a key; the **Encrypt** button creates a SOPS version — with `.sops.yaml`, an explicit age recipient or the server key. |
 | **Real editor** | CodeMirror with YAML/JSON highlighting, search, folding, `Ctrl+S`, live syntax validation and a masked secret tree that jumps to a line. |
-| **Keys, three ways** | Server key file, environment/`SOPS_AGE_KEY`, or a key pasted in the UI (process memory only, TTL 8 h, bound to the tab cookie). Missing key? The dialog shows the recipients from the file metadata. |
+| **Keys, four ways** | Fernet-encrypted server store (replace-only, never readable back), server key file, environment/`SOPS_AGE_KEY`, or a key pasted in the UI (process memory only, TTL 8 h, bound to the tab cookie). Missing key? The dialog shows the recipients from the file metadata. |
 | **Live changes pane** | A toolbar toggle splits the editor: the second pane shows only the changed regions (old lines red, new green, 3 lines of context) and keeps up with typing and scrolling. A separate window compares the working file with `HEAD`, decrypted and side by side. |
 | **Visible progress** | Opening, uploading and saving show the real phases (path check, SOPS metadata, `sops decrypt`, format detection, git) with an elapsed timer — no dead spinners. |
-| **Git built in** | Branch/file status, committing only the current file, push, `pull --ff-only`, clone from a URL into `/data/repos`. |
+| **Git built in** | Branch/file status, commit author/committer from GitLab identity, `Made-with: SOPS Editor` trailer, push, `pull --ff-only`, HTTPS/SSH clone and sparse checkout of a single folder. |
 | **Bilingual** | RU/EN switch in the header; the documentation follows the language and the theme. |
 | **One container** | FastAPI serves the API and the static UI. No nginx, no build step, no Node on the server. |
 
@@ -74,18 +74,18 @@ Open a file from a git checkout, a cloned repository or your own computer — it
 
 ```mermaid
 flowchart LR
-  repo[(git repo<br/>*.enc.yaml)] -->|mount /workspace| api
-  ui[browser] -->|HTTPS + Basic auth| api[FastAPI]
-  api -->|sops decrypt| mem[plaintext<br/>memory only]
-  mem --> editor[CodeMirror + secret tree]
-  editor -->|sops edit| sops[(SOPS<br/>ENV / .sops.yaml)]
-  sops -->|ciphertext| repo
-  api -.->|ciphertext only| backups[(/data/backups)]
+  dev[Developer] -->|HTTPS + Basic auth| web[ai-sops-editor]
+  web -->|SOPS decrypt/edit in memory| key[(server key<br/>Fernet keyring /data)]
+  web -->|commit + push| gh[(GitHub<br/>public repository)]
+  gh -->|pull + build| lab[lab machine]
+  web -.->|clones/uploads/backups| pvc[(/data)]
 ```
 
 The browser never receives the private key: it sends the path (or the ciphertext),
 the server decrypts with `sops`, and the plaintext travels only over the
-authenticated HTTPS connection to a single tab.
+authenticated HTTPS connection to a single tab. Corporate deployments use the
+GitLab repository (`ai-sops-editor`) as the canonical GitOps source; this GitHub
+repository is the public copy used by the lab machine.
 
 ## Quick start
 
@@ -123,7 +123,7 @@ paths, e.g. `/workspace/secrets/app.enc.yaml`.
 Some Compose builds cannot use Bake. Build directly, then start:
 
 ```bash
-docker build -t ai-sops-edit:local .
+docker build -t ai-sops-editor:local .
 docker compose --env-file docker/.env --env-file docker/.env.secrets up -d
 ```
 
@@ -166,6 +166,7 @@ press **Encrypt**.
 
 | Source | How to set | Notes |
 |---|---|---|
+| Encrypted server store | **Key** → **Server key** → paste and update | `/data/server-key/keyring.json`; replace-only, no read endpoint |
 | Server file | `keys/age.txt` → `/keys/age.txt` | `chmod 600`, owned by the container user (root by default) |
 | Environment | `SOPS_AGE_KEY` / `SOPS_AGE_KEY_FILE` | PGP/KMS use their usual variables and credentials |
 | UI session | **Key** button → paste `AGE-SECRET-KEY-1…` | process memory, TTL 8 h, bound to the tab cookie |
@@ -197,9 +198,12 @@ At any moment the file on disk is either the old or the new ciphertext.
 ## Git
 
 - **Commit** — `git add -- <file>` + `git commit -- <file>`; only the current file.
+  Name/email fields set author and committer and must match a verified GitLab email;
+  the app appends `Made-with: SOPS Editor`.
 - **Push** — `git push`; for HTTPS set `SOPS_EDITOR_GIT_TOKEN` (GitLab `oauth2`,
   GitHub `x-access-token`), for SSH mount a key/agent.
-- **Clone** — URL + branch into `/data/repos/<name>`; the token never comes from the UI.
+- **Clone** — HTTPS or SSH URL + branch + optional folder into `/data/repos/<name>`.
+  A folder uses partial clone + sparse checkout (only that folder and root config).
 - **Pull** — `--ff-only`, only with a clean worktree.
 
 ## Deploy on a server behind Traefik
@@ -209,7 +213,7 @@ cp docker/.env.example docker/.env
 cp docker/.env.secrets.example docker/.env.secrets
 # docker/.env:
 #   SOPS_EDITOR_WORKSPACE=/srv/git/secrets
-#   SOPS_EDITOR_FQDN=sops.example.com
+#   SOPS_EDITOR_FQDN=ai-sops-editor.vitebsk.energo.net
 #   SOPS_EDITOR_TRUST_PROXY=true
 #   SOPS_EDITOR_COOKIE_SECURE=true
 # docker/.env.secrets:
@@ -281,7 +285,7 @@ Dependencies are managed with [uv](https://docs.astral.sh/uv/) and pinned in
 ```bash
 cd backend
 uv sync --extra test        # creates backend/.venv from uv.lock
-uv run pytest -q            # 32 tests
+uv run pytest -q            # 49 tests
 uv run ruff check app tests
 ```
 

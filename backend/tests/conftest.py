@@ -64,7 +64,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: demo
-  namespace: sops-editor
+  namespace: ai-sops-editor
 type: Opaque
 stringData:
   password: hunter2

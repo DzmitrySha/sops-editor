@@ -23,7 +23,7 @@ before starting. After changing dependencies in `backend/pyproject.toml`, run
 The frontend is plain static files (`frontend/`): no build step, no bundler.
 Reload the page after editing `app.js`, `styles.css`, `i18n.js` or `help*.html`.
 
-Docker workflow: `docker build -t ai-sops-edit:local .` and
+Docker workflow: `docker build -t ai-sops-editor:local .` and
 `docker compose --env-file docker/.env --env-file docker/.env.secrets up -d --force-recreate`.
 
 ## Tests

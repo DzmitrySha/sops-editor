@@ -1,0 +1,117 @@
+# Single-container NeuroAI app: FastAPI serves both API and static frontend.
+# This is a documented deviation from the two-service ai-template contract
+# (no separate frontend/nginx, no database, no migrations).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-sops-editor-config
+data:
+  SOPS_EDITOR_STORAGE: "/data"
+  SOPS_EDITOR_ROOTS: "/data/repos"
+  SOPS_EDITOR_AUTH_MODE: "basic"
+  SOPS_EDITOR_AUTH_USER: "sops"
+  SOPS_EDITOR_TRUST_PROXY: "true"
+  SOPS_EDITOR_COOKIE_SECURE: "true"
+  SOPS_EDITOR_ALLOW_GIT_CLONE: "true"
+  SOPS_EDITOR_GIT_ALLOWED_HOSTS: "gitlab.vitebsk.energo.net,github.com"
+  SOPS_EDITOR_GIT_SSH_DIR: "/ssh"
+  SOPS_EDITOR_GIT_SSH_STRICT_HOST_KEY_CHECKING: "accept-new"
+  SOPS_EDITOR_MAX_FILE_BYTES: "5242880"
+  SOPS_EDITOR_BACKUP_KEEP: "10"
+  SOPS_EDITOR_SESSION_TTL_SECONDS: "28800"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-sops-editor
+  labels:
+    app: ai-sops-editor
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ai-sops-editor
+  template:
+    metadata:
+      labels:
+        app: ai-sops-editor
+    spec:
+      imagePullSecrets:
+        - name: ai-registry-pull
+      containers:
+        - name: ai-sops-editor
+          image: ai-registry.vitebsk.energo.net/ai-sops-editor/ai-sops-editor:placeholder
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: ai-sops-editor-config
+            - secretRef:
+                name: ai-sops-editor-secret
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: ssh
+              mountPath: /ssh
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ai-sops-editor-data
+        - name: ssh
+          secret:
+            secretName: ai-sops-editor-secret
+            optional: false
+            defaultMode: 0400
+            items:
+              - key: id_ed25519
+                path: id_ed25519
+              - key: known_hosts
+                path: known_hosts
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-sops-editor
+spec:
+  selector:
+    app: ai-sops-editor
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

@@ -1,0 +1,197 @@
+# ai-sops-editor — NeuroAI ai-opo GitOps.
+# MR/main: tests. Any git tag: decide → BuildKit/retag → bump newTag → Argo.
+# Offline CI is intentionally NOT included here (gitlab-ci/offline is local only).
+#
+# CI variables: GIT_PUSH_TOKEN, REGISTRY_PASSWORD
+# Optional tag override: BUILD_IMAGES=all|ai-sops-editor
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG
+
+variables:
+  GIT_DEPTH: "0"
+  GIT_SSL_NO_VERIFY: "true"
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
+  REGISTRY_PUSH: docker-registry.registry.svc.cluster.local:5000
+  REGISTRY_USER: registry
+  IMG_APP: ai-sops-editor/ai-sops-editor
+  DOCKER_BUILDKIT: "1"
+
+stages: [test, decide, build, bump]
+
+# --- tests (MR + main) ---
+
+backend:test:
+  stage: test
+  image: python:3.12-slim
+  tags: [ai-k8s]
+  interruptible: true
+  cache:
+    key: uv-$CI_COMMIT_REF_SLUG
+    paths:
+      - .cache/uv
+  variables:
+    SOPS_VERSION: "3.13.3"
+    AGE_VERSION: "1.3.2"
+    SOPS_SHA256: "e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b"
+    AGE_SHA256: "cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10"
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git tar
+    - curl -fsSL -o /tmp/sops "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
+    - echo "${SOPS_SHA256}  /tmp/sops" | sha256sum -c -
+    - install -m 0755 /tmp/sops /usr/local/bin/sops
+    - curl -fsSL -o /tmp/age.tar.gz "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz"
+    - echo "${AGE_SHA256}  /tmp/age.tar.gz" | sha256sum -c -
+    - tar -xzf /tmp/age.tar.gz -C /usr/local/bin --strip-components=1 age/age age/age-keygen
+    - sops --version && age-keygen --version
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - export PATH="$HOME/.local/bin:$PATH"
+  script:
+    - cd backend
+    - uv sync --locked --extra test
+    - uv run ruff check app tests
+    - uv run pytest -q
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# --- decide build vs retag for the single image (any tag) ---
+
+decide-image:
+  stage: decide
+  image: alpine/git:2.47.2
+  tags: [ai-k8s]
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      set -e
+      BUILD_IMAGE=0
+      PREV_TAG=$(git tag -l --sort=-v:refname | grep -Fxv "${CI_COMMIT_TAG}" | head -1 || true)
+
+      if [ -n "${BUILD_IMAGES:-}" ]; then
+        echo "BUILD_IMAGES override: ${BUILD_IMAGES}"
+        case "${BUILD_IMAGES}" in
+          all|ai-sops-editor) BUILD_IMAGE=1 ;;
+          *) echo "unknown BUILD_IMAGES value: ${BUILD_IMAGES}"; exit 1 ;;
+        esac
+      elif [ -z "${PREV_TAG}" ]; then
+        echo "no previous tag → build"
+        BUILD_IMAGE=1
+      else
+        CHANGED=$(git diff --name-only "${PREV_TAG}..${CI_COMMIT_TAG}" || true)
+        echo "auto-diff ${PREV_TAG}..${CI_COMMIT_TAG}"
+        echo "${CHANGED}"
+        rm -f /tmp/decide.flags
+        printf '%s\n' "${CHANGED}" | while IFS= read -r f; do
+          [ -n "${f}" ] || continue
+          case "${f}" in
+            Dockerfile|backend/*|frontend/*|docker/*|docker-compose*.yml)
+              echo BUILD_IMAGE >> /tmp/decide.flags
+              ;;
+          esac
+        done
+        if [ -f /tmp/decide.flags ] && grep -qx BUILD_IMAGE /tmp/decide.flags; then
+          BUILD_IMAGE=1
+        fi
+      fi
+
+      if [ -z "${PREV_TAG}" ] && [ "${BUILD_IMAGE}" != "1" ]; then
+        echo "PREV_TAG empty → cannot retag, build"
+        BUILD_IMAGE=1
+      fi
+
+      {
+        echo "PREV_TAG=${PREV_TAG}"
+        echo "BUILD_IMAGE=${BUILD_IMAGE}"
+      } > decide.env
+      cat decide.env
+  artifacts:
+    reports:
+      dotenv: decide.env
+
+# --- single image: BuildKit or registry retag ---
+
+build-image:
+  stage: build
+  image:
+    name: moby/buildkit:v0.21.1
+    entrypoint: [""]
+  tags: [ai-k8s]
+  rules:
+    - if: $CI_COMMIT_TAG
+  needs:
+    - job: decide-image
+      artifacts: true
+  before_script:
+    - test -n "${REGISTRY_PASSWORD}"
+    - mkdir -p ~/.docker /tmp/buildkit
+    - |
+      cat > /tmp/buildkit/buildkitd.toml <<EOF
+      [registry."${REGISTRY_PUSH}"]
+        http=true
+        insecure=true
+      EOF
+    - |
+      cat > ~/.docker/config.json <<EOF
+      {"auths":{"${REGISTRY_PUSH}":{"username":"${REGISTRY_USER}","password":"${REGISTRY_PASSWORD}"}}}
+      EOF
+  script:
+    - |
+      set -e
+      export BUILDKITD_FLAGS="--config=/tmp/buildkit/buildkitd.toml"
+      if [ "${BUILD_IMAGE}" = "1" ]; then
+        echo "build ${IMG_APP}:${CI_COMMIT_TAG}"
+        CACHE_REF="${REGISTRY_PUSH}/ai-sops-editor/cache/ai-sops-editor"
+        buildctl-daemonless.sh build \
+          --frontend dockerfile.v0 \
+          --local context=. --local dockerfile=. \
+          --opt filename=Dockerfile \
+          --import-cache type=registry,ref="${CACHE_REF}",registry.insecure=true \
+          --export-cache type=registry,ref="${CACHE_REF}",mode=max,registry.insecure=true \
+          --output type=image,name="${REGISTRY_PUSH}/${IMG_APP}:${CI_COMMIT_TAG}",push=true,registry.insecure=true
+      else
+        test -n "${PREV_TAG}" || { echo "PREV_TAG empty, cannot retag"; exit 1; }
+        echo "retag ${IMG_APP}:${PREV_TAG} → ${CI_COMMIT_TAG}"
+        mkdir -p /tmp/retag
+        printf 'FROM %s\n' "${REGISTRY_PUSH}/${IMG_APP}:${PREV_TAG}" > /tmp/retag/Dockerfile
+        buildctl-daemonless.sh build \
+          --frontend dockerfile.v0 \
+          --local context=/tmp/retag --local dockerfile=/tmp/retag \
+          --output type=image,name="${REGISTRY_PUSH}/${IMG_APP}:${CI_COMMIT_TAG}",push=true,registry.insecure=true
+      fi
+
+# --- GitOps bump (same newTag for the single image) ---
+
+bump:
+  stage: bump
+  image: alpine/git:2.47.2
+  tags: [ai-k8s]
+  resource_group: gitops
+  rules:
+    - if: $CI_COMMIT_TAG
+  needs: [build-image]
+  variables:
+    GIT_SSL_NO_VERIFY: "true"
+  before_script:
+    - test -n "${GIT_PUSH_TOKEN}"
+  script:
+    - |
+      set -e
+      git config user.email "${CI_PROJECT_NAME}@${CI_SERVER_HOST}"
+      git config user.name "${CI_PROJECT_NAME}"
+      git remote set-url origin "https://oauth2:${GIT_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      git fetch origin main && git checkout -B main origin/main
+      git pull --rebase origin main
+      sed -i "s/newTag: .*/newTag: ${CI_COMMIT_TAG}/" infra/k8s/kustomization.yaml
+      git add infra/k8s/kustomization.yaml
+      if git diff --cached --quiet; then
+        echo "already ${CI_COMMIT_TAG}"
+      else
+        git commit -m "Bump image to ${CI_COMMIT_TAG} [skip ci]"
+        git pull --rebase origin main
+        git push origin main
+      fi

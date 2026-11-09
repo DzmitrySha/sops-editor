@@ -9,19 +9,19 @@
 #   docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
 #     --env-file docker/.env --env-file docker/.env.secrets up -d --build
 
-name: ai-sops-edit
+name: ai-sops-editor
 
 networks:
   default:
-    name: ai-sops-edit_default
+    name: ai-sops-editor_default
 
 services:
-  ai-sops-edit:
+  ai-sops-editor:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ${SOPS_EDITOR_IMAGE:-ai-sops-edit:local}
-    container_name: ai-sops-edit
+    image: ${SOPS_EDITOR_IMAGE:-ai-sops-editor:local}
+    container_name: ai-sops-editor
     restart: unless-stopped
     env_file:
       - path: docker/.env

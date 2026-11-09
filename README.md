@@ -4,28 +4,18 @@
 
 <h1>SOPS Editor</h1>
 
-Веб-редактор секретов, зашифрованных <a href="https://github.com/getsops/sops">SOPS</a>.<br>
+Веб-редактор секретов, зашифрованных <a href="https://getsops.io/">SOPS</a>.<br>
 Файл из git-чекаута, склонированного репозитория или с вашего компьютера расшифровывается **в памяти**, редактируется в настоящем редакторе и сохраняется обратно **зашифрованным** — с теми же получателями и правилами `.sops.yaml`.
 
-<a href="https://github.com/DzmitrySha/sops-editor/actions/workflows/ci.yml"><img src="https://github.com/DzmitrySha/sops-editor/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2dd4bf?style=flat-square" alt="License: MIT"></a>
 <img src="https://img.shields.io/badge/python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+">
-<img src="https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
+<img src="https://img.shields.io/badge/FastAPI-0.162-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
 <img src="https://img.shields.io/badge/SOPS-3.13-8a2be2?style=flat-square" alt="SOPS 3.13">
 <img src="https://img.shields.io/badge/age-1.3-00b3a4?style=flat-square" alt="age 1.3">
 <img src="https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
 <img src="https://img.shields.io/badge/i18n-RU%20%2F%20EN-22c55e?style=flat-square" alt="RU / EN">
 
-<img src="https://img.shields.io/github/stars/DzmitrySha/sops-editor?style=flat-square&color=f5b301" alt="Stars">
-<img src="https://img.shields.io/github/forks/DzmitrySha/sops-editor?style=flat-square" alt="Forks">
-<img src="https://img.shields.io/github/issues/DzmitrySha/sops-editor?style=flat-square" alt="Issues">
-<img src="https://img.shields.io/github/issues-pr/DzmitrySha/sops-editor?style=flat-square" alt="Pull requests">
-<img src="https://img.shields.io/github/last-commit/DzmitrySha/sops-editor?style=flat-square" alt="Last commit">
-<img src="https://img.shields.io/github/commit-activity/m/DzmitrySha/sops-editor?style=flat-square" alt="Commit activity">
-<img src="https://img.shields.io/github/repo-size/DzmitrySha/sops-editor?style=flat-square" alt="Repo size">
-<img src="https://img.shields.io/github/languages/code-size/DzmitrySha/sops-editor?style=flat-square" alt="Code size">
-
-<sub><a href=".github/README.md">English</a> · Русская версия · <a href="docs/ru/DEPLOY.md">Деплой</a> · <a href="docs/ru/SECURITY.md">Безопасность</a></sub>
+<sub>Русская версия · <a href="docs/ru/DEPLOY.md">Деплой</a> · <a href="docs/ru/SECURITY.md">Безопасность</a></sub>
 
 </div>
 
@@ -33,8 +23,8 @@
 
 | Тёмная тема | Светлая тема |
 |---|---|
-| ![Редактор, тёмная тема](docs/screenshots/home-dark.png) | ![Редактор, светлая тема](docs/screenshots/home-light.png) |
-| ![Зашифрованный файл в редакторе](docs/screenshots/editor-dark.png) | ![Встроенная документация](docs/screenshots/help-dark.png) |
+| ![Редактор, тёмная тема](docs/screenshots/ru/home-dark.png) | ![Редактор, светлая тема](docs/screenshots/ru/home-light.png) |
+| ![Редактор YAML](docs/screenshots/ru/editor-dark.png) | ![Встроенная документация](docs/screenshots/ru/help-dark.png) |
 
 ## Содержание
 
@@ -46,7 +36,7 @@
 - [Ключи](#ключи)
 - [Как устроено сохранение](#как-устроено-сохранение)
 - [Git](#git)
-- [Деплой за Traefik](#деплой-за-traefik)
+- [Деплой: Docker и NeuroAI k8s](#деплой-docker-и-neuroai-k8s)
 - [Настройки](#настройки)
 - [HTTP API](#http-api)
 - [Разработка и тесты](#разработка-и-тесты)
@@ -74,18 +64,21 @@
 
 ```mermaid
 flowchart LR
-  repo[(git repo<br/>*.enc.yaml)] -->|mount /workspace| api
-  ui[browser] -->|HTTPS + Basic auth| api[FastAPI]
-  api -->|sops decrypt| mem[plaintext<br/>memory only]
-  mem --> editor[CodeMirror + secret tree]
-  editor -->|sops edit| sops[(SOPS<br/>ENV / .sops.yaml)]
-  sops -->|ciphertext| repo
-  api -.->|ciphertext only| backups[(/data/backups)]
+  dev[Разработчик] -->|HTTPS + Basic auth| web[ai-sops-editor]
+  web -->|SOPS decrypt/edit in memory| key[(серверный ключ<br/>Fernet keyring /data)]
+  web -->|commit + push| gl[(GitLab<br/>канонический репозиторий)]
+  gl -->|git tag| ci[GitLab CI<br/>BuildKit / retag]
+  ci -->|image| reg[(ai-registry)]
+  ci -->|bump newTag| argo[Argo CD]
+  argo -->|GitOps Sync| k8s[ai-opo<br/>namespace ai-sops-editor]
+  k8s -->|HTTPS| users[Пользователи]
+  web -.->|clones/uploads/backups| pvc[(PVC /data)]
 ```
 
-Приватный ключ не попадает в браузер: он отправляет путь (или шифротекст), сервер
+Приватный ключ не попадает в браузер: он отправляет путь или шифротекст, сервер
 расшифровывает его через `sops`, а открытый текст идёт только по аутентифицированному
-HTTPS-соединению в одну вкладку.
+HTTPS-соединению в одну вкладку. GitLab — единственный источник истины; деплой
+запускается тегом и Argo CD.
 
 ## Быстрый старт
 
@@ -101,8 +94,8 @@ HTTPS-соединению в одну вкладку.
 ### Linux / macOS (Docker Compose)
 
 ```bash
-git clone https://github.com/DzmitrySha/sops-editor.git
-cd sops-editor
+git clone git@gitlab.vitebsk.energo.net:opo/neuro-ai/ai-sops-editor.git
+cd ai-sops-editor
 cp docker/.env.example docker/.env
 cp docker/.env.secrets.example docker/.env.secrets
 # docker/.env: SOPS_EDITOR_WORKSPACE=/path/to/repo
@@ -122,7 +115,7 @@ docker compose --env-file docker/.env --env-file docker/.env.secrets up -d --bui
 Часть сборок Compose не умеет Bake. Соберите образ напрямую и запустите:
 
 ```bash
-docker build -t ai-sops-edit:local .
+docker build -t ai-sops-editor:local .
 docker compose --env-file docker/.env --env-file docker/.env.secrets up -d
 ```
 
@@ -207,8 +200,8 @@ grep 'public key' age.txt   # этого получателя добавьте �
   `~/.gitconfig`, смонтированного в `/gitconfig`). Email должен совпадать с
   подтверждённым email в GitLab, иначе коммит не привяжется к пользователю.
   В сообщение автоматически добавляется трейлер `Made-with: SOPS Editor`.
-- **Push** — `git push`; для HTTPS задайте `SOPS_EDITOR_GIT_TOKEN` (GitLab `oauth2`,
-  GitHub `x-access-token`), для SSH смонтируйте ключ/agent.
+- **Push** — `git push`; для HTTPS задайте `SOPS_EDITOR_GIT_TOKEN` (GitLab `oauth2`),
+  для SSH смонтируйте ключ/agent.
 - **SSH** — host `~/.ssh` монтируется read-only в `/ssh`; приватный ключ
   (`id_ed25519`/`id_ecdsa`/`id_rsa`) копируется в `0600` на время операции.
   Поддерживаются `git@host:group/repo.git` и `ssh://git@host:port/...`.
@@ -220,14 +213,16 @@ grep 'public key' age.txt   # этого получателя добавьте �
   корневые файлы вроде `.sops.yaml`, а не весь репозиторий.
 - **Pull** — только `--ff-only` и только при чистом worktree.
 
-## Деплой за Traefik
+## Деплой: Docker и NeuroAI k8s
+
+### Lab/work Compose за Traefik
 
 ```bash
 cp docker/.env.example docker/.env
 cp docker/.env.secrets.example docker/.env.secrets
 # docker/.env:
 #   SOPS_EDITOR_WORKSPACE=/srv/git/secrets
-#   SOPS_EDITOR_FQDN=sops.example.com
+#   SOPS_EDITOR_FQDN=ai-sops-editor.vitebsk.energo.net
 #   SOPS_EDITOR_TRUST_PROXY=true
 #   SOPS_EDITOR_COOKIE_SECURE=true
 # docker/.env.secrets:
@@ -238,8 +233,25 @@ docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
 ```
 
 Нужна внешняя сеть `traefik_proxy`. Подробности:
-[docs/ru/DEPLOY.md](docs/ru/DEPLOY.md) · [docs/ru/SECURITY.md](docs/ru/SECURITY.md) ·
-[English](docs/DEPLOY.md).
+[docs/ru/DEPLOY.md](docs/ru/DEPLOY.md) · [docs/ru/SECURITY.md](docs/ru/SECURITY.md).
+
+### Prod NeuroAI (k8s + GitOps)
+
+- FQDN: `ai-sops-editor.vitebsk.energo.net`; lab/work — `ai-sops-editor-dev.vitebsk.energo.net`.
+- Namespace / Argo Application: `ai-sops-editor`.
+- Образ: `ai-registry.vitebsk.energo.net/ai-sops-editor/ai-sops-editor`.
+- Манифесты: `infra/k8s`; разовый bootstrap — `infra/bootstrap/ai-sops-editor.yaml`.
+- Секреты: SOPS `infra/k8s/ai-sops-editor-secret.enc.yaml` через KSOPS.
+- PVC: `ai-sops-editor-data` → `/data`; одна реплика, `Recreate`.
+- CI: `.gitlab-ci.yml`; **любой git tag** → decide → BuildKit/retag → bump `newTag` → Argo Sync.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Порядок первого выката: [docs/DEPLOY-K8S-FIRST-RUN.md](docs/DEPLOY-K8S-FIRST-RUN.md).
+Канон и отклонения: [docs/DEPLOY-STANDARD.md](docs/DEPLOY-STANDARD.md).
 
 ## Настройки
 
@@ -305,7 +317,7 @@ docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
 ```bash
 cd backend
 uv sync --extra test        # создаёт backend/.venv по uv.lock
-uv run pytest -q            # 32 теста
+uv run pytest -q            # 49 тестов
 uv run ruff check app tests
 ```
 
@@ -336,8 +348,9 @@ docker-compose*.yml локальный / Traefik / офлайн
 start-windows.cmd   запуск на Windows
 windows/            установщик ярлыка
 docs/               деплой, безопасность, скриншоты (ru/ — русские версии)
+infra/              Kustomize, SOPS Secret, Argo bootstrap
+.gitlab-ci.yml      GitLab CI: tag → image → bump
 README.md           русская версия — её показывает GitLab
-.github/README.md   английская версия — её показывает GitHub
 ```
 
 ## Планы
@@ -362,18 +375,11 @@ README.md           русская версия — её показывает Gi
 
 ## Участие
 
-Issues и pull requests приветствуются — см. [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues и merge requests — в GitLab-проекте
+[`opo/neuro-ai/ai-sops-editor`](https://gitlab.vitebsk.energo.net/opo/neuro-ai/ai-sops-editor).
 Об уязвимостях сообщайте приватно согласно [SECURITY.md](SECURITY.md), не в
 публичный issue.
 
 ## Лицензия
 
 [MIT](LICENSE) © 2026 Dzmitry.
-
-<div align="center">
-<sub>Если инструмент экономит вам время — ⭐ помогает другим его найти.</sub>
-</div>
-
-<a href="https://star-history.com/#DzmitrySha/sops-editor&Date">
-  <img src="https://api.star-history.com/svg?repos=DzmitrySha/sops-editor&type=Date" alt="Star history" width="720">
-</a>

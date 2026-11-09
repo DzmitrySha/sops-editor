@@ -73,14 +73,14 @@ jobs:
           context: .
           push: false
           load: true
-          tags: ai-sops-edit:ci
+          tags: ai-sops-editor:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Smoke test
         run: |
           set -eux
-          docker run -d --name smoke -p 8080:8080 ai-sops-edit:ci
+          docker run -d --name smoke -p 8080:8080 ai-sops-editor:ci
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8080/api/health >/tmp/health.json; then break; fi
             sleep 2
