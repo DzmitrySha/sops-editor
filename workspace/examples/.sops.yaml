@@ -1,0 +1,15 @@
+# Правила шифрования для примеров. Проверить: sops filestatus <файл>
+creation_rules:
+  # k8s-подобный секрет: шифруются только data/stringData, metadata открыта.
+  - path_regex: (secrets|plain)[/\\]app\.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age18d5wxjdagq0zw82ph7q57pf0s0jgrzpfcujfxsskg7up96d8w47qn8vvr4
+  # Остальные YAML шифруются целиком.
+  - path_regex: (secrets|plain)[/\\].*\.enc\.yaml$
+    age: age18d5wxjdagq0zw82ph7q57pf0s0jgrzpfcujfxsskg7up96d8w47qn8vvr4
+  # JSON и INI.
+  - path_regex: .*\.enc\.(json|ini)$
+    age: age18d5wxjdagq0zw82ph7q57pf0s0jgrzpfcujfxsskg7up96d8w47qn8vvr4
+  # dotenv (.env.enc).
+  - path_regex: .*\.env\.enc$
+    age: age18d5wxjdagq0zw82ph7q57pf0s0jgrzpfcujfxsskg7up96d8w47qn8vvr4

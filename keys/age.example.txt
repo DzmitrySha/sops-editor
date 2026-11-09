@@ -1,0 +1,5 @@
+# DEMO KEY - public on purpose, used only by the files in workspace/examples.
+# NEVER protect real secrets with it. Generate your own: age-keygen -o keys/age.txt
+# created: 2026-11-06T18:21:36+03:00
+# public key: age18d5wxjdagq0zw82ph7q57pf0s0jgrzpfcujfxsskg7up96d8w47qn8vvr4
+AGE-SECRET-KEY-18E8GA8EED0ZXFA40D87LACWQ9JCZD7FLY8DJ2MJNUKKSYK9FSMUQ4DU4TN

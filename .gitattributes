@@ -1,0 +1,20 @@
+* text=auto eol=lf
+
+# Windows launchers must keep CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# binaries
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
+
+# vendored assets: do not count them in language stats diffs
+frontend/vendor/** linguist-vendored
+*.min.js linguist-vendored
+*.min.css linguist-vendored
+
+# generated / docs
+docs/screenshots/** linguist-documentation
