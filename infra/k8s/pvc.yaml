@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: sops-editor-data
+  name: ai-sops-editor-data
 spec:
   accessModes:
     - ReadWriteOnce

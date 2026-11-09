@@ -74,7 +74,7 @@ Open a file from a git checkout, a cloned repository or your own computer — it
 
 ```mermaid
 flowchart LR
-  dev[Developer] -->|HTTPS + Basic auth| web[sops-editor]
+  dev[Developer] -->|HTTPS + Basic auth| web[ai-sops-editor]
   web -->|SOPS decrypt/edit in memory| key[(server key<br/>Fernet keyring /data)]
   web -->|commit + push| gh[(GitHub<br/>public repository)]
   gh -->|pull + build| lab[lab machine]
@@ -84,7 +84,7 @@ flowchart LR
 The browser never receives the private key: it sends the path (or the ciphertext),
 the server decrypts with `sops`, and the plaintext travels only over the
 authenticated HTTPS connection to a single tab. Corporate deployments use the
-GitLab repository (`sops-editor`) as the canonical GitOps source; this GitHub
+GitLab repository (`ai-sops-editor`) as the canonical GitOps source; this GitHub
 repository is the public copy used by the lab machine.
 
 ## Quick start
@@ -123,7 +123,7 @@ paths, e.g. `/workspace/secrets/app.enc.yaml`.
 Some Compose builds cannot use Bake. Build directly, then start:
 
 ```bash
-docker build -t ai-sops-edit:local .
+docker build -t ai-sops-editor:local .
 docker compose --env-file docker/.env --env-file docker/.env.secrets up -d
 ```
 
@@ -213,7 +213,7 @@ cp docker/.env.example docker/.env
 cp docker/.env.secrets.example docker/.env.secrets
 # docker/.env:
 #   SOPS_EDITOR_WORKSPACE=/srv/git/secrets
-#   SOPS_EDITOR_FQDN=sops-editor.vitebsk.energo.net
+#   SOPS_EDITOR_FQDN=ai-sops-editor.vitebsk.energo.net
 #   SOPS_EDITOR_TRUST_PROXY=true
 #   SOPS_EDITOR_COOKIE_SECURE=true
 # docker/.env.secrets:

@@ -1,4 +1,4 @@
-# Деплой sops-editor в контуре NeuroAI
+# Деплой ai-sops-editor в контуре NeuroAI
 
 Канон: [`ai-template/docs/DEPLOY-STANDARD.md`](../../ai-template/docs/DEPLOY-STANDARD.md).
 Здесь зафиксированы контракт проекта и отклонения.
@@ -8,8 +8,8 @@
 | Контур | Как | FQDN |
 |---|---|---|
 | Local Docker | base Compose + `.env` + `.env.secrets` | `http://localhost:8787` |
-| Lab/work Compose | `docker-compose.yml` + `docker-compose.traefik.yml` + dual env | `sops-editor-dev.vitebsk.energo.net` |
-| ai-opo k8s | git tag → GitLab CI → registry → bump → Argo | `sops-editor.vitebsk.energo.net` |
+| Lab/work Compose | `docker-compose.yml` + `docker-compose.traefik.yml` + dual env | `ai-sops-editor-dev.vitebsk.energo.net` |
+| ai-opo k8s | git tag → GitLab CI → registry → bump → Argo | `ai-sops-editor.vitebsk.energo.net` |
 | Offline VM | `offline-docker-cli` + `.offline-docker.json` (не root CI) | — |
 
 ## Что совпадает с каноном
@@ -18,7 +18,7 @@
 - Kustomize + Argo bootstrap + SOPS/KSOPS;
 - PVC `/data`, RWO, 1 replica, `Recreate`;
 - tag-pipeline: decide → BuildKit/retag → bump `newTag`;
-- registry `ai-registry.vitebsk.energo.net/sops-editor/sops-editor`;
+- registry `ai-registry.vitebsk.energo.net/ai-sops-editor/ai-sops-editor`;
 - FQDN lab/work с `-dev`, prod без;
 - offline config не включён в root CI;
 - loguru и `{}`-логи уже используются.

@@ -1,12 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: sops-editor
+namespace: ai-sops-editor
 resources:
   - pvc.yaml
-  - sops-editor.yaml
+  - ai-sops-editor.yaml
   - httproutes.yaml
 generators:
   - secret-generator.yaml
 images:
-  - name: ai-registry.vitebsk.energo.net/sops-editor/sops-editor
+  - name: ai-registry.vitebsk.energo.net/ai-sops-editor/ai-sops-editor
     newTag: placeholder

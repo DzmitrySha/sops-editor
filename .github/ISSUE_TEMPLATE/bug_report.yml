@@ -53,6 +53,6 @@ body:
     attributes:
       label: Logs / screenshots
       description: |
-        `docker compose logs --tail=100 ai-sops-edit`, browser console errors or
+        `docker compose logs --tail=100 ai-sops-editor`, browser console errors or
         screenshots. Remove secrets and paths you do not want to share.
       render: shell

@@ -1,12 +1,12 @@
-# ENV-файлы sops-editor
+# ENV-файлы ai-sops-editor
 
 | Файл | Назначение |
 |---|---|
 | `docker/.env.example` → `.env` | settings: workspace, storage, auth user, FQDN, limits |
 | `docker/.env.secrets.example` → `.env.secrets` | Basic password, git token, Fernet keystore key |
-| K8s ConfigMap `sops-editor-config` | settings prod |
-| K8s SOPS Secret `sops-editor-secret` | credentials + optional SSH keys |
-| `./storage` ↔ PVC `sops-editor-data` | `/data` |
+| K8s ConfigMap `ai-sops-editor-config` | settings prod |
+| K8s SOPS Secret `ai-sops-editor-secret` | credentials + optional SSH keys |
+| `./storage` ↔ PVC `ai-sops-editor-data` | `/data` |
 
 ## Compose
 

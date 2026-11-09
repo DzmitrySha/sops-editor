@@ -1,11 +1,11 @@
-# ENV layers — sops-editor
+# ENV layers — ai-sops-editor
 
 | Слой | Compose | K8s |
 |---|---|---|
-| Settings | `docker/.env` | ConfigMap `sops-editor-config` |
-| Credentials | `docker/.env.secrets` | SOPS Secret `sops-editor-secret` |
+| Settings | `docker/.env` | ConfigMap `ai-sops-editor-config` |
+| Credentials | `docker/.env.secrets` | SOPS Secret `ai-sops-editor-secret` |
 | Defaults | `backend/app/config.py` | same |
-| Data | `./storage:/data` | PVC `sops-editor-data` → `/data` |
+| Data | `./storage:/data` | PVC `ai-sops-editor-data` → `/data` |
 
 ## Secret (только credentials)
 

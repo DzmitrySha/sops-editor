@@ -45,9 +45,9 @@ if "%SOPS_EDITOR_WORKSPACE%"=="" set "SOPS_EDITOR_WORKSPACE=%CD%\workspace"
 set "SOPS_EDITOR_WORKSPACE=%SOPS_EDITOR_WORKSPACE:\=/%"
 if not exist "%SOPS_EDITOR_WORKSPACE%" mkdir "%SOPS_EDITOR_WORKSPACE%" 2>nul
 if defined PROMPTED_WS (
-  findstr /v /b /c:"SOPS_EDITOR_WORKSPACE=" "docker\.env" > "%TEMP%\sops-editor-env.tmp"
-  >> "%TEMP%\sops-editor-env.tmp" echo SOPS_EDITOR_WORKSPACE=%SOPS_EDITOR_WORKSPACE%
-  move /y "%TEMP%\sops-editor-env.tmp" "docker\.env" >nul
+  findstr /v /b /c:"SOPS_EDITOR_WORKSPACE=" "docker\.env" > "%TEMP%\ai-sops-editor-env.tmp"
+  >> "%TEMP%\ai-sops-editor-env.tmp" echo SOPS_EDITOR_WORKSPACE=%SOPS_EDITOR_WORKSPACE%
+  move /y "%TEMP%\ai-sops-editor-env.tmp" "docker\.env" >nul
 )
 
 if not defined SOPS_EDITOR_KEYS set "SOPS_EDITOR_KEYS=%CD%/keys"
@@ -78,7 +78,7 @@ echo.
 echo First build can take a few minutes...
 set "IMAGE=%SOPS_EDITOR_IMAGE%"
 if "%IMAGE%"=="" for /f "usebackq tokens=1,* delims==" %%A in (`findstr /b /c:"SOPS_EDITOR_IMAGE=" "docker\.env" 2^>nul`) do set "IMAGE=%%B"
-if "%IMAGE%"=="" set "IMAGE=ai-sops-edit:local"
+if "%IMAGE%"=="" set "IMAGE=ai-sops-editor:local"
 docker compose --env-file "docker\.env" --env-file "docker\.env.secrets" build
 if errorlevel 1 (
   echo Compose build failed; falling back to docker build...
@@ -102,7 +102,7 @@ echo Waiting for health...
 set /a TRIES=0
 :wait
 set /a TRIES+=1
-for /f "tokens=*" %%H in ('docker inspect --format "{{.State.Health.Status}}" ai-sops-edit 2^>nul') do set "HEALTH=%%H"
+for /f "tokens=*" %%H in ('docker inspect --format "{{.State.Health.Status}}" ai-sops-editor 2^>nul') do set "HEALTH=%%H"
 if "%HEALTH%"=="healthy" goto ready
 if %TRIES% GEQ 60 goto timeout
 timeout /t 2 /nobreak >nul
@@ -116,6 +116,6 @@ exit /b 0
 :timeout
 echo.
 echo Container did not become healthy. Last logs:
-docker compose --env-file "docker\.env" --env-file "docker\.env.secrets" logs --tail=40 ai-sops-edit
+docker compose --env-file "docker\.env" --env-file "docker\.env.secrets" logs --tail=40 ai-sops-editor
 pause
 exit /b 1

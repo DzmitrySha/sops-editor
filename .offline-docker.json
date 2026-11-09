@@ -1,7 +1,7 @@
 {
   "offline_cache": "offline-cache",
   "log_dir": "storage/logs",
-  "app_name": "sops-editor",
+  "app_name": "ai-sops-editor",
   "compose_online": "docker-compose.yml",
   "compose_offline": "docker-compose.offline.yml",
   "compose_build": [
@@ -32,11 +32,11 @@
     "backend": "Dockerfile"
   },
   "images": {
-    "backend": "ai-sops-edit:local",
-    "frontend": "ai-sops-edit:local"
+    "backend": "ai-sops-editor:local",
+    "frontend": "ai-sops-editor:local"
   },
   "build_services": [
-    "ai-sops-edit"
+    "ai-sops-editor"
   ],
   "docker_images": [
     "python:3.12-slim",

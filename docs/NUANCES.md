@@ -1,4 +1,4 @@
-# Nuances — sops-editor на NeuroAI
+# Nuances — ai-sops-editor на NeuroAI
 
 Канон: [`ai-template/docs/NUANCES.md`](../../ai-template/docs/NUANCES.md).
 Ниже — только отличия и важные детали этого приложения.
@@ -6,20 +6,20 @@
 ## FQDN и Traefik
 
 ```text
-lab/work: https://sops-editor-dev.vitebsk.energo.net
-prod:     https://sops-editor.vitebsk.energo.net   (без -dev)
+lab/work: https://ai-sops-editor-dev.vitebsk.energo.net
+prod:     https://ai-sops-editor.vitebsk.energo.net   (без -dev)
 ```
 
 Для Windows hosts:
 
 ```text
-127.0.0.1  sops-editor-dev.vitebsk.energo.net
+127.0.0.1  ai-sops-editor-dev.vitebsk.energo.net
 127.0.0.1  traefik.vitebsk.energo.net
 ```
 
 Compose использует `docker-compose.traefik.yml`; сеть `traefik_proxy` общая,
-service name `ai-sops-edit` уникален. Traefik router/service называются
-`sops-editor`; FQDN задаётся `SOPS_EDITOR_FQDN`.
+service name `ai-sops-editor` уникален. Traefik router/service называются
+`ai-sops-editor`; FQDN задаётся `SOPS_EDITOR_FQDN`.
 
 ## Один контейнер
 

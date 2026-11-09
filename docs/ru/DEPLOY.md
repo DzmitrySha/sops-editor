@@ -6,8 +6,8 @@
 |---|---|---|
 | Windows / localhost | `start-windows.cmd` или compose | `127.0.0.1:8787`, без auth по умолчанию |
 | Linux VM / сервер без Traefik | compose + `SOPS_EDITOR_BIND=0.0.0.0` | обязательно `SOPS_EDITOR_AUTH_PASSWORD` + HTTPS-прокси |
-| Общий сервер (dev) | base compose + `docker-compose.traefik.yml` | shared Traefik, `sops-editor-dev.vitebsk.energo.net`, Basic auth |
-| Общий сервер (prod) | k8s/HTTPRoute | `sops-editor.vitebsk.energo.net` (без `-dev`), Basic auth |
+| Общий сервер (dev) | base compose + `docker-compose.traefik.yml` | shared Traefik, `ai-sops-editor-dev.vitebsk.energo.net`, Basic auth |
+| Общий сервер (prod) | k8s/HTTPRoute | `ai-sops-editor.vitebsk.energo.net` (без `-dev`), Basic auth |
 | Офлайн | не поддержано «из коробки» | образ нужно собрать заранее и перенести |
 
 Приложение — **один контейнер**: FastAPI отдаёт API и статический frontend. Отдельный nginx/frontend не нужен; это осознанное отклонение от шаблона `ai-template`.
@@ -43,9 +43,9 @@ curl -fsS http://127.0.0.1:8787/api/health
    ```dotenv
    SOPS_EDITOR_WORKSPACE=/srv/secrets/repo
    # dev / work:
-   SOPS_EDITOR_FQDN=sops-editor-dev.vitebsk.energo.net
+   SOPS_EDITOR_FQDN=ai-sops-editor-dev.vitebsk.energo.net
    # prod (k8s/HTTPRoute, без -dev):
-   # SOPS_EDITOR_FQDN=sops-editor.vitebsk.energo.net
+   # SOPS_EDITOR_FQDN=ai-sops-editor.vitebsk.energo.net
    SOPS_EDITOR_TRUST_PROXY=true
    SOPS_EDITOR_COOKIE_SECURE=true
    SOPS_EDITOR_AUTH_USER=sops
@@ -63,10 +63,10 @@ curl -fsS http://127.0.0.1:8787/api/health
 4. Проверка:
    ```bash
    curl -fsS http://127.0.0.1:8787/api/health   # local port остаётся loopback
-   curl -u sops:... https://sops-editor-dev.vitebsk.energo.net/api/status
+   curl -u sops:... https://ai-sops-editor-dev.vitebsk.energo.net/api/status
    ```
 
-Сеть `traefik_proxy` должна существовать. Service name `ai-sops-edit` префиксован и не пересекается с другими проектами. TLS — на Traefik.
+Сеть `traefik_proxy` должна существовать. Service name `ai-sops-editor` префиксован и не пересекается с другими проектами. TLS — на Traefik.
 
 ### За обратным прокси
 
@@ -103,9 +103,9 @@ SOPS_EDITOR_AUTH_TRUSTED_PROXIES=172.18.0.0/16
 Пример oauth2-proxy + Traefik:
 
 ```yaml
-ai-sops-edit:
+ai-sops-editor:
   labels:
-    - traefik.http.routers.ai-sops-edit.middlewares=oauth2-proxy@docker
+    - traefik.http.routers.ai-sops-editor.middlewares=oauth2-proxy@docker
   environment:
     SOPS_EDITOR_AUTH_MODE: header
     SOPS_EDITOR_AUTH_TRUSTED_PROXIES: 172.18.0.0/16
@@ -140,7 +140,7 @@ docker compose ... up -d --build
 
 ```bash
 curl -fsS http://127.0.0.1:8787/api/health
-docker compose ... logs --tail=100 ai-sops-edit
+docker compose ... logs --tail=100 ai-sops-editor
 ```
 
 ## Резервные копии
@@ -162,4 +162,4 @@ docker compose ... logs --tail=100 ai-sops-edit
 | `git clone` fail | `SOPS_EDITOR_GIT_TOKEN`, allowlist хостов, сеть, ветка |
 | `git push` fail | remote, токен/SSH, права; коммит при этом уже создан |
 | контейнер unhealthy | `docker compose logs`, наличие `sops`/`age-keygen` в образе |
-| `failed to execute bake` при `compose build` | fallback: `docker build -t ai-sops-edit:local .` затем `docker compose ... up -d` (в `start-windows.cmd` уже есть) |
+| `failed to execute bake` при `compose build` | fallback: `docker build -t ai-sops-editor:local .` затем `docker compose ... up -d` (в `start-windows.cmd` уже есть) |

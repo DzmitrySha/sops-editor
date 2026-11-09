@@ -1,19 +1,19 @@
-# Prod FQDN: no -dev suffix (lab/work Compose uses sops-editor-dev…).
+# Prod FQDN: no -dev suffix (lab/work Compose uses ai-sops-editor-dev…).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: sops-editor-https
+  name: ai-sops-editor-https
 spec:
   parentRefs:
     - name: cilium-gateway
       namespace: kube-system
   hostnames:
-    - sops-editor.vitebsk.energo.net
+    - ai-sops-editor.vitebsk.energo.net
   rules:
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: sops-editor
+        - name: ai-sops-editor
           port: 8080

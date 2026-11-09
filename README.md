@@ -64,13 +64,13 @@
 
 ```mermaid
 flowchart LR
-  dev[Разработчик] -->|HTTPS + Basic auth| web[sops-editor]
+  dev[Разработчик] -->|HTTPS + Basic auth| web[ai-sops-editor]
   web -->|SOPS decrypt/edit in memory| key[(серверный ключ<br/>Fernet keyring /data)]
   web -->|commit + push| gl[(GitLab<br/>канонический репозиторий)]
   gl -->|git tag| ci[GitLab CI<br/>BuildKit / retag]
   ci -->|image| reg[(ai-registry)]
   ci -->|bump newTag| argo[Argo CD]
-  argo -->|GitOps Sync| k8s[ai-opo<br/>namespace sops-editor]
+  argo -->|GitOps Sync| k8s[ai-opo<br/>namespace ai-sops-editor]
   k8s -->|HTTPS| users[Пользователи]
   web -.->|clones/uploads/backups| pvc[(PVC /data)]
 ```
@@ -94,8 +94,8 @@ HTTPS-соединению в одну вкладку. GitLab — единств
 ### Linux / macOS (Docker Compose)
 
 ```bash
-git clone git@gitlab.vitebsk.energo.net:opo/neuro-ai/sops-editor.git
-cd sops-editor
+git clone git@gitlab.vitebsk.energo.net:opo/neuro-ai/ai-sops-editor.git
+cd ai-sops-editor
 cp docker/.env.example docker/.env
 cp docker/.env.secrets.example docker/.env.secrets
 # docker/.env: SOPS_EDITOR_WORKSPACE=/path/to/repo
@@ -115,7 +115,7 @@ docker compose --env-file docker/.env --env-file docker/.env.secrets up -d --bui
 Часть сборок Compose не умеет Bake. Соберите образ напрямую и запустите:
 
 ```bash
-docker build -t ai-sops-edit:local .
+docker build -t ai-sops-editor:local .
 docker compose --env-file docker/.env --env-file docker/.env.secrets up -d
 ```
 
@@ -222,7 +222,7 @@ cp docker/.env.example docker/.env
 cp docker/.env.secrets.example docker/.env.secrets
 # docker/.env:
 #   SOPS_EDITOR_WORKSPACE=/srv/git/secrets
-#   SOPS_EDITOR_FQDN=sops-editor.vitebsk.energo.net
+#   SOPS_EDITOR_FQDN=ai-sops-editor.vitebsk.energo.net
 #   SOPS_EDITOR_TRUST_PROXY=true
 #   SOPS_EDITOR_COOKIE_SECURE=true
 # docker/.env.secrets:
@@ -237,12 +237,12 @@ docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
 
 ### Prod NeuroAI (k8s + GitOps)
 
-- FQDN: `sops-editor.vitebsk.energo.net`; lab/work — `sops-editor-dev.vitebsk.energo.net`.
-- Namespace / Argo Application: `sops-editor`.
-- Образ: `ai-registry.vitebsk.energo.net/sops-editor/sops-editor`.
-- Манифесты: `infra/k8s`; разовый bootstrap — `infra/bootstrap/sops-editor.yaml`.
-- Секреты: SOPS `infra/k8s/sops-editor-secret.enc.yaml` через KSOPS.
-- PVC: `sops-editor-data` → `/data`; одна реплика, `Recreate`.
+- FQDN: `ai-sops-editor.vitebsk.energo.net`; lab/work — `ai-sops-editor-dev.vitebsk.energo.net`.
+- Namespace / Argo Application: `ai-sops-editor`.
+- Образ: `ai-registry.vitebsk.energo.net/ai-sops-editor/ai-sops-editor`.
+- Манифесты: `infra/k8s`; разовый bootstrap — `infra/bootstrap/ai-sops-editor.yaml`.
+- Секреты: SOPS `infra/k8s/ai-sops-editor-secret.enc.yaml` через KSOPS.
+- PVC: `ai-sops-editor-data` → `/data`; одна реплика, `Recreate`.
 - CI: `.gitlab-ci.yml`; **любой git tag** → decide → BuildKit/retag → bump `newTag` → Argo Sync.
 
 ```bash
@@ -376,7 +376,7 @@ README.md           русская версия — её показывает Gi
 ## Участие
 
 Issues и merge requests — в GitLab-проекте
-[`opo/neuro-ai/sops-editor`](https://gitlab.vitebsk.energo.net/opo/neuro-ai/sops-editor).
+[`opo/neuro-ai/ai-sops-editor`](https://gitlab.vitebsk.energo.net/opo/neuro-ai/ai-sops-editor).
 Об уязвимостях сообщайте приватно согласно [SECURITY.md](SECURITY.md), не в
 публичный issue.
 

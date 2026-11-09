@@ -13,7 +13,7 @@ $od = "D:\opo\NeuroAI\offline-docker-cli\offline-docker.cmd"
 & $od up-offline -p .
 ```
 
-Образ локальной сборки — `ai-sops-edit:local` (compose). Offline-кэш —
+Образ локальной сборки — `ai-sops-editor:local` (compose). Offline-кэш —
 `offline-cache/`, он gitignored. Для обновления образа на offline VM:
 `git pull`, затем `build-offline`/`up-offline`.
 

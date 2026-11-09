@@ -25,8 +25,8 @@ k8s-подобного `app.enc.yaml`).
 
 ```bash
 # в контейнере (пути контейнера):
-docker exec -it ai-sops-edit sops -d /workspace/examples/secrets/app.enc.yaml
-docker exec -it ai-sops-edit sops filestatus /workspace/examples/.env.enc
+docker exec -it ai-sops-editor sops -d /workspace/examples/secrets/app.enc.yaml
+docker exec -it ai-sops-editor sops filestatus /workspace/examples/.env.enc
 
 # на хосте с локальными бинарниками:
 .tools/sops.exe -d workspace/examples/secrets/db.enc.yaml
@@ -38,7 +38,7 @@ SOPS_AGE_KEY_FILE=keys/age.txt .tools/sops.exe filestatus workspace/examples/con
 1. Вкладка **«Файл на сервере»** → `Обзор` → `examples` → `secrets` → `app.enc.yaml` → «Открыть».
 2. Правка `stringData.password` → **Ctrl+S** («Сохранить»).
 3. Справа «Изменения» — diff; в левой панели появится резервная копия.
-4. `docker exec -it ai-sops-edit sops -d /workspace/examples/secrets/app.enc.yaml` — новый пароль.
+4. `docker exec -it ai-sops-editor sops -d /workspace/examples/secrets/app.enc.yaml` — новый пароль.
 
 ## Сценарий 2. Зашифровать файл с компьютера
 

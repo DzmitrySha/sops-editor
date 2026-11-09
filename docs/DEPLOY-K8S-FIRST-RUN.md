@@ -1,23 +1,23 @@
-# Первый выкат sops-editor на ai-opo
+# Первый выкат ai-sops-editor на ai-opo
 
 Деплой этим документом **не выполняется**. Порядок для ручного первого выката.
 
 ## Предпосылки
 
-- [ ] GitLab project `opo/neuro-ai/sops-editor`, ветка `main`.
+- [ ] GitLab project `opo/neuro-ai/ai-sops-editor`, ветка `main`.
 - [ ] Runner `ai-k8s`; CI variables `GIT_PUSH_TOKEN`, `REGISTRY_PASSWORD`.
-- [ ] Argo repo Secret `repo-sops-editor` (deploy key).
-- [ ] Registry pull secret `ai-registry-pull` в namespace `sops-editor`.
-- [ ] DNS + Gateway SAN `sops-editor.vitebsk.energo.net`.
+- [ ] Argo repo Secret `repo-ai-sops-editor` (deploy key).
+- [ ] Registry pull secret `ai-registry-pull` в namespace `ai-sops-editor`.
+- [ ] DNS + Gateway SAN `ai-sops-editor.vitebsk.energo.net`.
 - [ ] SOPS age private key на админ-машине (`~/.config/sops/age/keys.txt`) и в `argocd/sops-age`.
 - [ ] Продовый age-ключ SOPS для импорта в UI (не коммитить в Git).
 
 ## 1. Секрет
 
 ```bash
-cp infra/k8s/sops-editor-secret.example.yaml infra/k8s/sops-editor-secret.enc.yaml
+cp infra/k8s/ai-sops-editor-secret.example.yaml infra/k8s/ai-sops-editor-secret.enc.yaml
 # заполнить AUTH_PASSWORD, KEYSTORE_KEY, при необходимости git token/SSH key
-sops -e -i infra/k8s/sops-editor-secret.enc.yaml
+sops -e -i infra/k8s/ai-sops-editor-secret.enc.yaml
 ```
 
 KSOPS расшифрует Secret при Argo Sync; CI SOPS не читает.
@@ -26,13 +26,13 @@ KSOPS расшифрует Secret при Argo Sync; CI SOPS не читает.
 
 ```bash
 export KUBECONFIG=~/.kube/ai
-kubectl create ns sops-editor --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n sops-editor create secret docker-registry ai-registry-pull \
+kubectl create ns ai-sops-editor --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n ai-sops-editor create secret docker-registry ai-registry-pull \
   --docker-server=ai-registry.vitebsk.energo.net \
   --docker-username=registry \
   --docker-password="$(cat ~/.kube/ai-registry.password)"
 
-kubectl apply -f infra/bootstrap/sops-editor.yaml
+kubectl apply -f infra/bootstrap/ai-sops-editor.yaml
 ```
 
 ## 3. Tag
@@ -48,9 +48,9 @@ CI: `decide-image` → `build-image` (или retag) → `bump` обновляе�
 ## 4. Smoke
 
 ```bash
-kubectl -n sops-editor get pods,pvc
-kubectl -n sops-editor get cm sops-editor-config -o yaml
-curl -fsS https://sops-editor.vitebsk.energo.net/api/health
+kubectl -n ai-sops-editor get pods,pvc
+kubectl -n ai-sops-editor get cm ai-sops-editor-config -o yaml
+curl -fsS https://ai-sops-editor.vitebsk.energo.net/api/health
 ```
 
 Открыть UI, войти Basic auth, импортировать продовый ключ в
