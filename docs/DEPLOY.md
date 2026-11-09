@@ -8,8 +8,8 @@ Russian version: [ru/DEPLOY.md](ru/DEPLOY.md).
 |---|---|---|
 | Windows / localhost | `start-windows.cmd` or Compose | `127.0.0.1:8787`, no auth by default |
 | Linux VM / server without Traefik | Compose + `SOPS_EDITOR_BIND=0.0.0.0` | `SOPS_EDITOR_AUTH_PASSWORD` is mandatory + HTTPS proxy |
-| Shared server (dev) | base Compose + `docker-compose.traefik.yml` | shared Traefik, `sops-dev.example.com`, Basic auth |
-| Shared server (prod) | k8s/HTTPRoute | `sops.example.com`, Basic auth/OIDC |
+| Shared server (dev) | base Compose + `docker-compose.traefik.yml` | shared Traefik, `sops-editor-dev.vitebsk.energo.net`, Basic auth |
+| Shared server (prod) | k8s/HTTPRoute | `sops-editor.vitebsk.energo.net`, Basic auth |
 | Offline | not supported out of the box | build the image in advance and copy it |
 
 The application is a **single container**: FastAPI serves both the API and the
@@ -51,9 +51,9 @@ Port: `SOPS_EDITOR_PORT`. Bind address: `SOPS_EDITOR_BIND` (default `127.0.0.1`)
    ```dotenv
    SOPS_EDITOR_WORKSPACE=/srv/secrets/repo
    # dev / work:
-   SOPS_EDITOR_FQDN=sops-dev.example.com
+   SOPS_EDITOR_FQDN=sops-editor-dev.vitebsk.energo.net
    # prod (k8s/HTTPRoute, without -dev):
-   # SOPS_EDITOR_FQDN=sops.example.com
+   # SOPS_EDITOR_FQDN=sops-editor.vitebsk.energo.net
    SOPS_EDITOR_TRUST_PROXY=true
    SOPS_EDITOR_COOKIE_SECURE=true
    SOPS_EDITOR_AUTH_USER=sops
@@ -71,7 +71,7 @@ Port: `SOPS_EDITOR_PORT`. Bind address: `SOPS_EDITOR_BIND` (default `127.0.0.1`)
 4. Check:
    ```bash
    curl -fsS http://127.0.0.1:8787/api/health   # the local port stays loopback
-   curl -u sops:... https://sops-dev.example.com/api/status
+   curl -u sops:... https://sops-editor-dev.vitebsk.energo.net/api/status
    ```
 
 The `traefik_proxy` network must exist. The service name `ai-sops-edit` is

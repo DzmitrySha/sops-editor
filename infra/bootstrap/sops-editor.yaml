@@ -1,0 +1,30 @@
+# Argo CD Application — sops-editor.
+# Apply once after the GitLab project, deploy key and registry pull secret exist.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sops-editor
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@gitlab.vitebsk.energo.net:opo/neuro-ai/sops-editor.git
+    targetRevision: main
+    path: infra/k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sops-editor
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

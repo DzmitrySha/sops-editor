@@ -46,3 +46,6 @@ desktop.ini
 
 # local backup archives
 sops_ed_it.part*.rar
+
+# offline build cache
+offline-cache/

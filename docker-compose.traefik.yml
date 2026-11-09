@@ -4,10 +4,9 @@
 #     --env-file docker/.env --env-file docker/.env.secrets up -d --build
 #
 # docker/.env:
-#   # dev / work:
-#   SOPS_EDITOR_FQDN=sops-dev.example.com
-#   # prod (k8s/HTTPRoute, без -dev):
-#   # SOPS_EDITOR_FQDN=sops.example.com
+#   # lab / work:
+#   SOPS_EDITOR_FQDN=sops-editor-dev.vitebsk.energo.net
+#   # prod k8s HTTPRoute — без -dev: sops-editor.vitebsk.energo.net
 #   SOPS_EDITOR_TRUST_PROXY=true
 #   SOPS_EDITOR_COOKIE_SECURE=true
 #   SOPS_EDITOR_AUTH_PASSWORD=<strong secret>   # in .env.secrets
@@ -23,10 +22,10 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=traefik_proxy
-      - traefik.http.routers.ai-sops-edit.rule=Host(`${SOPS_EDITOR_FQDN:-sops-dev.example.com}`)
-      - traefik.http.routers.ai-sops-edit.entrypoints=websecure
-      - traefik.http.routers.ai-sops-edit.tls=true
-      - traefik.http.services.ai-sops-edit.loadbalancer.server.port=8080
+      - traefik.http.routers.sops-editor.rule=Host(`${SOPS_EDITOR_FQDN:-sops-editor-dev.vitebsk.energo.net}`)
+      - traefik.http.routers.sops-editor.entrypoints=websecure
+      - traefik.http.routers.sops-editor.tls=true
+      - traefik.http.services.sops-editor.loadbalancer.server.port=8080
 
 networks:
   traefik_proxy:

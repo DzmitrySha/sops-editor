@@ -220,7 +220,15 @@ def test_json_and_dotenv_round_trip(workspace):
     root = workspace["root"]
     json_plain = root / "secrets" / "app.json"
     json_plain.write_text(json.dumps({"token": "one", "count": 2}) + "\n", encoding="utf-8")
-    # .json names are not matched by the yaml creation rule; encrypt via explicit age.
+    # The repo root now has a deployment .sops.yaml for infra/k8s. Use a local
+    # config so the test does not depend on the caller's cwd.
+    json_config = workspace["tmp"] / "json.sops.yaml"
+    json_config.write_text(
+        "creation_rules:\n"
+        "  - path_regex: .*\\.json$\n"
+        f"    age: {workspace['public']}\n",
+        encoding="utf-8",
+    )
     env = __import__("os").environ.copy()
     env["SOPS_AGE_KEY_FILE"] = str(workspace["key_file"])
     import subprocess
@@ -228,6 +236,8 @@ def test_json_and_dotenv_round_trip(workspace):
     result = subprocess.run(
         [
             workspace["settings"].sops_bin,
+            "--config",
+            str(json_config),
             "--age",
             workspace["public"],
             "--encrypt",

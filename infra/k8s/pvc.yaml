@@ -1,0 +1,13 @@
+# Persistent data: cloned repositories, uploads, backups and the encrypted
+# server-key store. RWO → one replica and Recreate in the Deployment.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sops-editor-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi

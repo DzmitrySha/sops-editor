@@ -18,9 +18,13 @@ frontend/vendor/**/*.map
 *.log
 .github
 docs
+infra
+.gitlab-ci.yml
+.offline-docker.json
 README.md
 README.ru.md
 CONTRIBUTING.md
 SECURITY.md
 LICENSE
 *.cmd
+offline-cache
