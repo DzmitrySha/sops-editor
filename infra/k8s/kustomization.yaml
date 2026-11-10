@@ -9,4 +9,4 @@ generators:
   - secret-generator.yaml
 images:
   - name: ai-registry.vitebsk.energo.net/ai-sops-editor/ai-sops-editor
-    newTag: 0.0.1
+    newTag: 0.0.2
