@@ -334,14 +334,10 @@
       </div>
       <label class="field-label" for="commitMessage">Сообщение</label>
       <input class="input" id="commitMessage" type="text" maxlength="500" autocomplete="off">
-      <div class="form-grid">
-        <label class="field-label" for="commitAuthorName">Автор коммита (GitLab)</label>
-        <input class="input" id="commitAuthorName" type="text" maxlength="100" autocomplete="name" placeholder="Имя Фамилия">
-        <label class="field-label" for="commitAuthorEmail">Email в GitLab</label>
-        <input class="input" id="commitAuthorEmail" type="email" maxlength="254" autocomplete="email" placeholder="user@company.example">
-      </div>
+      <label class="field-label">Автор и committer</label>
+      <div class="key-current" id="commitIdentity">…</div>
       <label class="check"><input type="checkbox" id="commitPush"> запушить после коммита</label>
-      <p class="hint">Автор и committer будут этой личностью; email должен совпадать с подтверждённым email в GitLab. В сообщение автоматически добавляется трейлер <code>Made-with: SOPS Editor</code>. Уйдёт только этот файл.</p>
+      <p class="hint">Личность коммита задаётся на сервере (<code>SOPS_EDITOR_GIT_AUTHOR_NAME</code>/<code>_EMAIL</code>) и не редактируется в UI. В сообщение автоматически добавляется трейлер <code>Made-with: SOPS Editor</code>. Уйдёт только этот файл.</p>
       <div class="modal-actions">
         <button class="btn ghost" data-close="commitModal" type="button">Отмена</button>
         <button class="btn primary" id="btnCommitRun" type="button">Закоммитить</button>
@@ -474,6 +470,6 @@
   <script src="/vendor/js-yaml.min.js"></script>
   <script src="/vendor/diff.min.js"></script>
   <script src="/i18n.js?v=16"></script>
-  <script src="/app.js?v=33"></script>
+  <script src="/app.js?v=34"></script>
 </body>
 </html>

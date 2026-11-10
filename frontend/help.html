@@ -203,7 +203,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
         <table class="doc-table">
           <thead><tr><th>Кнопка</th><th>Что делает</th></tr></thead>
           <tbody>
-            <tr><td>Коммит</td><td><code>git add -- файл</code> + <code>git commit -- файл</code>; в коммит попадает только открытый файл. Имя и email автора берутся из полей коммита и становятся также committer; email должен совпадать с GitLab. В сообщение добавляется <code>Made-with: SOPS Editor</code>. Галочка «запушить» делает push после коммита.</td></tr>
+            <tr><td>Коммит</td><td><code>git add -- файл</code> + <code>git commit -- файл</code>; в коммит попадает только открытый файл. Имя и email автора/committer заданы на сервере через <code>SOPS_EDITOR_GIT_AUTHOR_NAME</code>/<code>_EMAIL</code>; в UI их изменить нельзя. Email должен совпадать с подтверждённым email сервисного аккаунта GitLab. В сообщение добавляется <code>Made-with: SOPS Editor</code>. Галочка «запушить» делает push после коммита.</td></tr>
             <tr><td>↻ (pull)</td><td><code>git pull --ff-only</code>, только при чистом рабочем дереве. После pull файл перезагружается.</td></tr>
             <tr><td>Дифф с HEAD</td><td>Открывает окно «Изменения» сразу на вкладке «С HEAD»: сервер расшифровывает версию из <code>HEAD</code> и текущий файл, они показываются рядом в две колонки с номерами строк. Обе стороны расшифровываются в памяти сервера, в браузер уходит уже открытый текст, как и при обычном открытии файла.</td></tr>
             <tr><td>Из git</td><td><code>git clone</code> в <code>/data/repos/&lt;имя&gt;</code>; необязательная папка.</td></tr>
@@ -212,6 +212,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
         <p>Для приватных HTTPS-репозиториев задайте <code>SOPS_EDITOR_GIT_TOKEN</code> (GitLab: <code>oauth2</code>, GitHub: <code>x-access-token</code>); токен не передаётся из UI. Для SSH host <code>~/.ssh</code> монтируется read-only в <code>/ssh</code>, приватный ключ ищется автоматически (или задайте <code>SOPS_EDITOR_GIT_SSH_KEY</code>). Работают <code>git@host:group/repo.git</code> и <code>ssh://git@host:port/group/repo.git</code>. Хосты клонирования можно ограничить через <code>SOPS_EDITOR_GIT_ALLOWED_HOSTS</code>.</p>
         <p>Если указать <strong>папку</strong> (например, <code>infra</code>), используется partial clone + sparse checkout: скачивается только она и корневые файлы вроде <code>.sops.yaml</code>, а не весь репозиторий.</p>
         <p>Клоны лежат в <code>/data/repos</code>. В обозревателе у каждой папки-клона есть кнопка удаления (корзинка); также кнопка <strong>«Склонированные репозитории»</strong> показывает список и позволяет удалить клон вручную. Неиспользуемые клоны автоматически удаляются через <code>SOPS_EDITOR_GIT_CLONE_TTL_DAYS</code> дней (по умолчанию 7; <code>0</code> отключает автоудаление).</p>
+        <p>Аудит: при открытии UI сервер пишет в <code>/data/logs/sops-editor.log</code> строку <code>UI opened from &lt;IP&gt;</code>, а изменения — IP и пользователя из auth. За Traefik задайте <code>SOPS_EDITOR_TRUST_PROXY=true</code>, чтобы использовать <code>X-Forwarded-For</code>.</p>
       </section>
 
       <section class="doc-section" id="auth">

@@ -165,61 +165,29 @@ class GitService:
             raise BadRequest("Не удалось прочитать версию из HEAD", code="git_failed")
         return result.stdout
 
-    def _author_args(self, root: Path) -> list[str]:
-        args: list[str] = []
-        for key, default in (
-            ("user.name", self.settings.git_author_name),
-            ("user.email", self.settings.git_author_email),
-        ):
-            result = self._run(["git", "-C", str(root), "config", "--get", key], cwd=root)
-            if result.returncode != 0 or not self._text(result):
-                args.extend(["-c", f"{key}={default}"])
-        return args
-
-    def _config_file_value(self, key: str) -> str:
-        config = Path(self.settings.git_config_global).expanduser()
-        if not config.is_file():
-            return ""
-        result = self._run(
-            ["git", "config", "--file", str(config), "--get", key],
-            cwd=Path.cwd(),
-        )
-        return self._text(result) if result.returncode == 0 else ""
-
-    def default_identity(self) -> dict[str, str]:
-        """Identity from the optional host .gitconfig, for UI prefill only."""
-        name = self._config_file_value("user.name")
-        email = self._config_file_value("user.email")
-        if name or email:
-            return {"name": name, "email": email, "source": "gitconfig"}
-        return {"name": "", "email": "", "source": "none"}
-
     @staticmethod
     def _validate_identity(name: str, email: str) -> None:
         if not name or not email:
-            raise BadRequest("Укажите имя и email автора коммита (как в GitLab)")
+            raise BadRequest("Задайте SOPS_EDITOR_GIT_AUTHOR_NAME и SOPS_EDITOR_GIT_AUTHOR_EMAIL")
         if len(name) > 100 or len(email) > 254:
-            raise BadRequest("Слишком длинное имя или email автора")
+            raise BadRequest("Слишком длинное имя или email автора коммита")
         forbidden = set("\r\n\x00<>")
         if any(ch in forbidden or ord(ch) < 32 for ch in name + email):
-            raise BadRequest("Некорректное имя или email автора")
+            raise BadRequest("Некорректное имя или email автора коммита")
         if not re.fullmatch(r"[^@\s]+@[^@\s]+", email):
-            raise BadRequest("Некорректный email автора")
+            raise BadRequest("Некорректный email автора коммита")
 
-    def _identity_args(
-        self,
-        root: Path,
-        author_name: str | None,
-        author_email: str | None,
-    ) -> list[str]:
-        if author_name is None and author_email is None:
-            return self._author_args(root)
-        name = (author_name or "").strip()
-        email = (author_email or "").strip()
+    def commit_identity(self) -> dict[str, str]:
+        """The server-side commit identity, fixed for every commit."""
+        name = self.settings.git_author_name.strip()
+        email = self.settings.git_author_email.strip()
         self._validate_identity(name, email)
-        # Set both author and committer: GitLab badges such a commit as the
-        # user's, rather than "SOPS Editor <sops-editor@localhost>".
-        return ["-c", f"user.name={name}", "-c", f"user.email={email}"]
+        return {"name": name, "email": email}
+
+    def _identity_args(self) -> list[str]:
+        identity = self.commit_identity()
+        # Force both author and committer; repository-local user.* is ignored.
+        return ["-c", f"user.name={identity['name']}", "-c", f"user.email={identity['email']}"]
 
     @staticmethod
     def _message_with_tool_note(message: str) -> str:
@@ -415,8 +383,6 @@ class GitService:
         path: Path,
         message: str,
         push: bool = False,
-        author_name: str | None = None,
-        author_email: str | None = None,
     ) -> dict:
         message = (message or "").strip()
         if not message:
@@ -426,7 +392,7 @@ class GitService:
         root = self.find_root(path)
         if root is None:
             raise BadRequest("Файл не находится в git-репозитории")
-        identity = self._identity_args(root, author_name, author_email)
+        identity = self._identity_args()
         message = self._message_with_tool_note(message)
         relative = path.resolve().relative_to(root).as_posix()
         add = self._run(["git", "-C", str(root), "add", "--", relative], cwd=root)

@@ -6,7 +6,32 @@ from pathlib import Path
 import yaml
 
 from app.config import Settings
-from app.main import create_app
+from app.main import _client_ip, create_app
+
+
+def _request(peer: str, headers: tuple[tuple[str, str], ...] = ()):
+    from starlette.requests import Request
+
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": [(name.lower().encode(), value.encode()) for name, value in headers],
+            "client": (peer, 12345),
+            "server": ("127.0.0.1", 80),
+            "scheme": "http",
+            "query_string": b"",
+            "root_path": "",
+            "http_version": "1.1",
+        }
+    )
+
+
+def test_client_ip_uses_forwarded_header_only_when_trusted():
+    forwarded = (("X-Forwarded-For", "203.0.113.7, 10.0.0.2"),)
+    assert _client_ip(_request("10.0.0.2", forwarded), Settings(trust_proxy=True)) == "203.0.113.7"
+    assert _client_ip(_request("10.0.0.2", forwarded), Settings(trust_proxy=False)) == "10.0.0.2"
 
 
 def open_file(client, path: Path) -> dict:

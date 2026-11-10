@@ -62,8 +62,6 @@ class CommitRequest(BaseModel):
     path: str = Field(min_length=1, max_length=4096)
     message: str = Field(min_length=1, max_length=500)
     push: bool = False
-    author_name: str | None = Field(default=None, max_length=100)
-    author_email: str | None = Field(default=None, max_length=254)
 
 
 class CloneRequest(BaseModel):
@@ -125,6 +123,35 @@ def _effective_host(request: Request, settings: Settings) -> str | None:
     if settings.trust_proxy:
         host = request.headers.get("x-forwarded-host", host)
     return host
+
+def _client_ip(request: Request, settings: Settings) -> str:
+    """Peer address, or the first forwarded hop when a proxy is trusted."""
+    peer = request.client.host if request.client else ""
+
+    def valid_ip(value: str) -> str | None:
+        value = value.strip().strip('"')
+        if value.startswith("[") and value.endswith("]"):
+            value = value[1:-1]
+        try:
+            ipaddress.ip_address(value)
+        except ValueError:
+            return None
+        return value[:64]
+
+    if settings.trust_proxy:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        candidates = [forwarded.split(",", 1)[0]] if forwarded else []
+        candidates.append(request.headers.get("x-real-ip", ""))
+        for candidate in candidates:
+            value = valid_ip(candidate)
+            if value:
+                return value
+    return valid_ip(peer) or "unknown"
+
+
+def _log_value(value: object, limit: int = 200) -> str:
+    text = str(value or "")
+    return re.sub(r"[\x00-\x1f\x7f]", "", text)[:limit]
 
 
 def _header_user(request: Request, settings: Settings) -> str | None:
@@ -410,6 +437,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         logger.info("SOPS Editor {} starting; roots={}", settings.version, [str(r) for r in guard.roots])
         if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", settings.auth_header):
             raise RuntimeError("Некорректный SOPS_EDITOR_AUTH_HEADER")
+        fixed_identity = git.commit_identity()
+        logger.info(
+            "Git commit identity: {} <{}>",
+            fixed_identity["name"],
+            fixed_identity["email"],
+        )
         settings.auth_trusted_networks  # raises ValueError on a bad CIDR
         if settings.auth_mode == "header" and not settings.auth_trusted_networks:
             logger.warning(
@@ -491,13 +524,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def security_middleware(request: Request, call_next):
         path = request.url.path
         started = time.monotonic()
+        client_ip = _client_ip(request, settings)
+        is_ui_page = path in {"/", "/help.html", "/help.en.html"}
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} or path.startswith("/api/"):
-            logger.debug("--> {} {}", request.method, path)
+            logger.debug("--> {} {} from {}", request.method, path, client_ip)
         # Authentication, except for the container health probe.
         if settings.auth_enabled and path != "/api/health":
             if settings.auth_mode == "header":
                 user = _header_user(request, settings)
                 if user is None:
+                    logger.warning("Auth failed: {} {} from {}", request.method, path, client_ip)
                     return JSONResponse(
                         status_code=401,
                         content={"error": {"code": "unauthorized", "message": "Требуется авторизация"}},
@@ -516,12 +552,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     except Exception:
                         valid = False
                 if not valid:
+                    logger.warning("Auth failed: {} {} from {}", request.method, path, client_ip)
                     response = JSONResponse(
                         status_code=401,
                         content={"error": {"code": "unauthorized", "message": "Требуется авторизация"}},
                     )
                     response.headers["WWW-Authenticate"] = 'Basic realm="SOPS Editor", charset="UTF-8"'
                     return response
+                request.state.user = user
 
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             origin = request.headers.get("origin")
@@ -542,12 +580,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 pass
 
         response = await call_next(request)
+        user = _log_value(getattr(request.state, "user", ""))
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} or path.startswith("/api/"):
             logger.debug(
-                "<-- {} {} {} ms (first byte)",
+                "<-- {} {} {} ms from {} (user={})",
                 request.method,
                 path,
                 round((time.monotonic() - started) * 1000),
+                client_ip,
+                user or "-",
+            )
+        if is_ui_page and request.method == "GET" and response.status_code == 200:
+            logger.info(
+                "UI opened from {} path={} user={} agent={}",
+                client_ip,
+                path,
+                user or "-",
+                _log_value(request.headers.get("user-agent", ""), 300) or "-",
+            )
+        elif request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            logger.info(
+                "{} {} from {} user={} -> {}",
+                request.method,
+                path,
+                client_ip,
+                user or "-",
+                response.status_code,
             )
 
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -708,7 +766,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "allow_git_clone": settings.allow_git_clone,
             "git_token_configured": bool(settings.git_token and settings.git_token.get_secret_value()),
             "git_ssh": git.ssh_status(),
-            "git_identity": git.default_identity(),
+            "git_commit_identity": git.commit_identity(),
             "max_file_bytes": settings.max_file_bytes,
             "backup_keep": settings.backup_keep,
         }
@@ -1148,13 +1206,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/git/commit")
     async def git_commit(body: CommitRequest):
         resolved = guard.resolve_file(body.path)
-        result = git.commit(
-            resolved,
-            body.message,
-            body.push,
-            body.author_name,
-            body.author_email,
-        )
+        result = git.commit(resolved, body.message, body.push)
         logger.info("Git commit for {}: {}", resolved, result.get("hash"))
         return result
 

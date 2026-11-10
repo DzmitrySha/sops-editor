@@ -22,7 +22,8 @@
 ## ConfigMap
 
 `SOPS_EDITOR_STORAGE=/data`, `SOPS_EDITOR_ROOTS=/data/repos`, basic auth,
-`TRUST_PROXY=true`, `COOKIE_SECURE=true`, Git allowlist, SSH mode, limits.
+`TRUST_PROXY=true`, `COOKIE_SECURE=true`, Git allowlist, fixed commit identity,
+SSH mode, limits.
 
 ## PVC
 

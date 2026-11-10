@@ -7,7 +7,6 @@
   const THEME_KEY = "sops-editor-theme";
   const REVEAL_KEY = "sops-editor-reveal";
   const SPLIT_KEY = "sops-editor-split";
-  const COMMIT_IDENTITY_KEY = "sops-editor-commit-identity-v1";
   const MAX_SECRET_ROWS = 800;
 
   const state = {
@@ -1846,34 +1845,14 @@
     holder.append(branch, status, commit);
   }
 
-  function readCommitIdentity() {
-    try {
-      const value = JSON.parse(localStorage.getItem(COMMIT_IDENTITY_KEY) || "{}");
-      return {
-        name: typeof value.name === "string" ? value.name : "",
-        email: typeof value.email === "string" ? value.email : "",
-      };
-    } catch {
-      return { name: "", email: "" };
-    }
-  }
-
-  function saveCommitIdentity(name, email) {
-    try {
-      localStorage.setItem(COMMIT_IDENTITY_KEY, JSON.stringify({ name, email }));
-    } catch {
-      // localStorage can be disabled; the commit itself still works.
-    }
-  }
-
   function openCommitModal() {
     if (!state.file || !state.file.git) return;
+    const identity = (state.status && state.status.git_commit_identity) || {};
     $("commitBranch").textContent = state.file.git.branch || "git";
     $("commitMessage").value = `chore(secrets): update ${state.file.name}`;
-    const saved = readCommitIdentity();
-    const detected = (state.status && state.status.git_identity) || {};
-    $("commitAuthorName").value = saved.name || detected.name || "";
-    $("commitAuthorEmail").value = saved.email || detected.email || "";
+    $("commitIdentity").textContent = identity.name && identity.email
+      ? `${identity.name} <${identity.email}>`
+      : "не настроен на сервере";
     $("commitPush").checked = false;
     openModal("commitModal");
     setTimeout(() => $("commitMessage").select(), 30);
@@ -1883,12 +1862,6 @@
     if (!state.file) return;
     const message = $("commitMessage").value.trim();
     if (!message) { toast("Коммит", "Введите сообщение", "warn"); return; }
-    const authorName = $("commitAuthorName").value.trim();
-    const authorEmail = $("commitAuthorEmail").value.trim();
-    if (!authorName || !authorEmail) {
-      toast("Коммит", "Укажите имя и email из GitLab, чтобы коммит был от вас.", "warn");
-      return;
-    }
     const push = $("commitPush").checked;
     state.busy = true;
     $("btnCommitRun").disabled = true;
@@ -1900,11 +1873,8 @@
           path: state.file.path,
           message,
           push,
-          author_name: authorName,
-          author_email: authorEmail,
         },
       });
-      saveCommitIdentity(authorName, authorEmail);
       closeModal("commitModal");
       if (!result.committed) {
         toast("Коммит не нужен", "Нет изменений в индексе.", "warn");
