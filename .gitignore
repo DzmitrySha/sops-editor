@@ -44,8 +44,32 @@ desktop.ini
 .vscode/
 *.swp
 
-# local backup archives
-sops_ed_it.part*.rar
+# archives (including split/multi-part and compressed tarballs)
+*.7z
+*.ace
+*.arj
+*.bz2
+*.cab
+*.gz
+*.iso
+*.lz
+*.lz4
+*.lzh
+*.lzma
+*.lzo
+*.rar
+*.tar
+*.tar.*
+*.tbz
+*.tbz2
+*.tgz
+*.txz
+*.tzst
+*.xz
+*.z
+*.zip
+*.zipx
+*.zst
 
 # offline build cache
 offline-cache/
