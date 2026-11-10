@@ -125,6 +125,8 @@ class SopsRunner:
         low = stderr.lower()
         if (
             "no identity matched" in low
+            or "identity did not match any of the recipients" in low
+            or "incorrect identity for recipient block" in low
             or "failed to get the data key" in low
             or "no master key" in low
             or "failed to decrypt" in low
