@@ -576,18 +576,28 @@ class GitService:
             raise BadRequest(self._clone_error(url, result.stderr))
         result_path = target
         if subdir:
-            kind = self._run(
-                ["git", "-C", str(target), "cat-file", "-t", f"HEAD:{subdir}"],
-                cwd=target,
-            )
-            if kind.returncode != 0 or self._text(kind) != "tree":
-                self._rmtree(target)
-                raise BadRequest(f"Папка {subdir!r} не найдена в репозитории")
-            sparse = self._run(
-                ["git", "-C", str(target), "sparse-checkout", "set", "--cone", subdir],
-                cwd=target,
-                timeout=120,
-            )
+            # Partial clones fetch missing blobs from the promisor remote even
+            # after the initial clone. Keep using the same auth environment for
+            # cat-file/sparse-checkout, otherwise Git asks for the SSH host key
+            # again and sparse checkout fails with "Host key verification failed".
+            sparse_env, sparse_temp = self._auth_env(url)
+            try:
+                kind = self._run(
+                    ["git", "-C", str(target), "cat-file", "-t", f"HEAD:{subdir}"],
+                    cwd=target,
+                    extra_env=sparse_env,
+                )
+                if kind.returncode != 0 or self._text(kind) != "tree":
+                    self._rmtree(target)
+                    raise BadRequest(f"Папка {subdir!r} не найдена в репозитории")
+                sparse = self._run(
+                    ["git", "-C", str(target), "sparse-checkout", "set", "--cone", subdir],
+                    cwd=target,
+                    timeout=120,
+                    extra_env=sparse_env,
+                )
+            finally:
+                self._cleanup_dir(sparse_temp)
             if sparse.returncode != 0:
                 self._rmtree(target)
                 logger.warning("sparse checkout failed for {}: {}", subdir, sanitize_stderr(sparse.stderr, 500))

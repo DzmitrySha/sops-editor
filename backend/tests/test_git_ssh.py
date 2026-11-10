@@ -104,6 +104,40 @@ def test_explicit_missing_ssh_key_is_reported(tmp_path: Path):
         service._ssh_auth_env()
 
 
+def test_sparse_checkout_reuses_auth_environment(tmp_path: Path, monkeypatch):
+    settings = Settings(
+        roots=str(tmp_path),
+        storage=str(tmp_path / "storage"),
+        allow_git_clone=True,
+        git_ssh_dir=str(tmp_path / "no-ssh"),
+    )
+    service = GitService(settings)
+    auth = {"GIT_SSH_COMMAND": "ssh -i /tmp/key"}
+    calls: list[tuple[list[str], dict[str, str] | None]] = []
+
+    def fake_run(args, *, cwd, timeout=30.0, extra_env=None):
+        calls.append((args, extra_env))
+        if "clone" in args:
+            return subprocess.CompletedProcess(args, 0, b"", b"")
+        if "cat-file" in args:
+            return subprocess.CompletedProcess(args, 0, b"tree\n", b"")
+        if "sparse-checkout" in args:
+            return subprocess.CompletedProcess(args, 0, b"", b"")
+        if "rev-parse" in args:
+            return subprocess.CompletedProcess(args, 0, b"main\n", b"")
+        return subprocess.CompletedProcess(args, 0, b"", b"")
+
+    monkeypatch.setattr(service, "_auth_env", lambda url: (auth, None))
+    monkeypatch.setattr(service, "_run", fake_run)
+    monkeypatch.setattr(service, "repo_info", lambda path: {})
+
+    service.clone("git@gitlab.example.com:group/repo.git", None, "demo", "infra/k8s")
+
+    sparse_calls = [(args, env) for args, env in calls if "sparse-checkout" in args]
+    assert sparse_calls
+    assert sparse_calls[0][1] == auth
+
+
 def test_sparse_clone_checks_out_only_subdir(tmp_path: Path):
     source = tmp_path / "source"
     make_repo(source)
