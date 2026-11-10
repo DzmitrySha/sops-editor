@@ -271,6 +271,7 @@ git push origin v0.1.0
 | `SOPS_EDITOR_BACKUP_KEEP` | `10` | копий на файл |
 | `SOPS_EDITOR_SESSION_TTL_SECONDS` | `28800` | TTL ключа в UI |
 | `SOPS_EDITOR_ALLOW_GIT_CLONE` | `true` | разрешить клонирование |
+| `SOPS_EDITOR_GIT_CLONE_TTL_DAYS` | `7` | автоудаление неиспользуемых клонов; `0` отключает |
 | `SOPS_EDITOR_GIT_ALLOWED_HOSTS` | пусто | allowlist хостов для клона |
 | `SOPS_EDITOR_GIT_TOKEN` | пусто | HTTPS-токен git |
 | `SOPS_EDITOR_HOST_SSH_DIR` | `./.ssh-host` | host-каталог `~/.ssh`, монтируется в `/ssh` |
