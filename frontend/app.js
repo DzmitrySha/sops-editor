@@ -45,6 +45,8 @@
       search: false,
     },
     backups: [],
+    clones: [],
+    cloneTtlDays: 0,
     confirmResolver: null,
   };
 
@@ -2011,6 +2013,88 @@
     openModal("backupsModal");
   }
 
+
+  // ---------------------------------------------------------------- clones
+  function pathWithin(child, parent) {
+    const c = pathKey(child);
+    const p = pathKey(parent);
+    return c === p || c.startsWith(p + "/");
+  }
+
+  function formatAge(days) {
+    if (!Number.isFinite(days)) return "—";
+    if (days < 1) return "сегодня";
+    if (days < 2) return "1 день";
+    if (days < 5) return `${Math.floor(days)} дня`;
+    return `${Math.floor(days)} дней`;
+  }
+
+  async function openClonesModal() {
+    $("clonesList").innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+    $("clonesHint").textContent = "";
+    openModal("clonesModal");
+    try {
+      const result = await api("/api/git/clones");
+      state.clones = result.clones || [];
+      state.cloneTtlDays = Number(result.ttl_days) || 0;
+      renderClones(state.cloneTtlDays);
+    } catch (error) {
+      $("clonesList").innerHTML = "";
+      $("clonesList").append(emptyNode(error.message));
+    }
+  }
+
+  function renderClones(ttlDays) {
+    const holder = $("clonesList");
+    holder.innerHTML = "";
+    if (!state.clones.length) {
+      holder.append(emptyNode("Склонированных репозиториев нет."));
+    }
+    for (const item of state.clones) {
+      const row = document.createElement("div");
+      row.className = "backup-full clone-row";
+      const name = document.createElement("strong");
+      name.className = "mono";
+      name.textContent = item.name;
+      const meta = document.createElement("span");
+      meta.className = "muted";
+      meta.textContent = `${item.branch || "?"} · ${formatAge(item.age_days)}`;
+      meta.title = item.remote || item.path || "";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "icon-btn sm danger";
+      remove.title = "Удалить клон с сервера";
+      remove.innerHTML = '<svg><use href="#i-x"/></svg>';
+      remove.addEventListener("click", () => deleteClone(item));
+      row.append(name, meta, remove);
+      holder.append(row);
+    }
+    const ttl = Number(ttlDays);
+    $("clonesHint").textContent = ttl > 0
+      ? `Автоудаление неиспользуемых клонов: через ${ttl} дн. Открытие файла обновляет срок.`
+      : "Автоудаление отключено: SOPS_EDITOR_GIT_CLONE_TTL_DAYS=0.";
+  }
+
+  async function deleteClone(item) {
+    if (state.file && pathWithin(state.file.path, item.path)) {
+      toast("Нельзя удалить клон", "Сначала закройте открытый файл из этого репозитория.", "warn");
+      return;
+    }
+    const ok = await showConfirm({
+      title: "Удалить клон?",
+      text: `Каталог «${item.name}» будет удалён с сервера. Незакоммиченные изменения пропадут.`,
+      okLabel: "Удалить",
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/git/clones/${encodeURIComponent(item.name)}`, { method: "DELETE" });
+      state.clones = state.clones.filter((entry) => entry.name !== item.name);
+      renderClones(state.cloneTtlDays);
+      toast("Клон удалён", item.name, "ok");
+    } catch (error) {
+      toast("Не удалось удалить клон", error.message, "bad");
+    }
+  }
   // ------------------------------------------------------- editor split pane
   function setSplit(enabled, { persist = true } = {}) {
     state.split = Boolean(enabled);
@@ -2650,6 +2734,8 @@
       if (event.key === "Enter") $("btnOpenPath").click();
     });
     $("btnClone").addEventListener("click", cloneRepo);
+    $("btnClones").addEventListener("click", openClonesModal);
+    $("btnClonesRail").addEventListener("click", openClonesModal);
     $("gitUrl").addEventListener("keydown", (event) => {
       if (event.key === "Enter") cloneRepo();
     });

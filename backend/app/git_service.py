@@ -106,6 +106,7 @@ class GitService:
         root = self.find_root(path)
         if root is None:
             return None
+        self._touch_clone(root)
         relative = path.resolve().relative_to(root).as_posix()
         branch_result = self._run(["git", "-C", str(root), "rev-parse", "--abbrev-ref", "HEAD"], cwd=root)
         branch = self._text(branch_result) if branch_result.returncode == 0 else "?"
@@ -517,6 +518,87 @@ class GitService:
                 "Используйте ssh-agent или отдельный deploy key без пароля."
             )
         return "git clone по SSH не удался. Проверьте ключ, known_hosts и доступ к GitLab."
+
+
+    # ---------------------------------------------------------------- clones
+    def _clones_root(self) -> Path:
+        return self.settings.storage_path / "repos"
+
+    def _touch_clone(self, root: Path) -> None:
+        """Refresh the clone mtime so TTL cleanup treats it as recently used."""
+        try:
+            root.resolve().relative_to(self._clones_root().resolve())
+            os.utime(root, None)
+        except (OSError, ValueError):
+            pass
+
+    def list_clones(self) -> list[dict]:
+        root = self._clones_root()
+        if not root.is_dir():
+            return []
+        now = time.time()
+        result: list[dict] = []
+        try:
+            entries = sorted(root.iterdir(), key=lambda item: item.name.lower())
+        except OSError:
+            return []
+        for entry in entries:
+            if entry.is_symlink() or not entry.is_dir() or not (entry / ".git").exists():
+                continue
+            try:
+                mtime = entry.stat().st_mtime
+            except OSError:
+                continue
+            remote = self._remote_url(entry)
+            branch_result = self._run(
+                ["git", "-C", str(entry), "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=entry,
+            )
+            result.append(
+                {
+                    "name": entry.name,
+                    "path": str(entry),
+                    "branch": self._text(branch_result) if branch_result.returncode == 0 else "?",
+                    "remote": redact_git_url(remote),
+                    "mtime": mtime,
+                    "age_days": max(0.0, (now - mtime) / 86400.0),
+                }
+            )
+        return result
+
+    def delete_clone(self, name: str) -> dict:
+        if not _SAFE_NAME_RE.fullmatch(name or "") or name in (".", ".."):
+            raise BadRequest("Некорректное имя клона")
+        root = self._clones_root().resolve()
+        raw_target = root / name
+        if raw_target.is_symlink():
+            raise BadRequest("Некорректный путь клона")
+        target = raw_target.resolve()
+        if target.parent != root or target == root:
+            raise BadRequest("Некорректный путь клона")
+        if not target.is_dir() or not (target / ".git").exists():
+            raise BadRequest("Клон не найден")
+        self._rmtree(target)
+        logger.info("Removed cloned repository {}", target)
+        return {"deleted": name, "path": str(target)}
+
+    def cleanup_clones(self, max_age_days: int) -> list[str]:
+        if max_age_days <= 0:
+            return []
+        cutoff = time.time() - max_age_days * 86400
+        removed: list[str] = []
+        for item in self.list_clones():
+            path = Path(item["path"])
+            try:
+                mtime = path.stat().st_mtime
+            except OSError:
+                continue
+            if mtime >= cutoff:
+                continue
+            self._rmtree(path)
+            removed.append(item["name"])
+            logger.info("Removed stale clone {} (age_days={:.1f})", item["name"], item["age_days"])
+        return removed
 
     def clone(
         self,

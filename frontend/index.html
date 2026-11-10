@@ -113,6 +113,7 @@
               <div class="input-row">
                 <button class="btn primary" id="btnClone" type="button">Клонировать в /data/repos</button>
               </div>
+              <button class="btn ghost full" id="btnClones" type="button">Склонированные репозитории</button>
               <p class="hint">HTTPS: укажите <code>SOPS_EDITOR_GIT_TOKEN</code> на сервере. SSH: host <code>~/.ssh</code> монтируется в <code>/ssh</code>. Если указать папку, скачивается только она (плюс корневые файлы вроде <code>.sops.yaml</code>), а не весь репозиторий.</p>
               <p class="hint" id="gitSshHint"></p>
             </div>
@@ -177,7 +178,7 @@
             <p class="hint hidden" id="localWriteHint"></p>
           </div>
           <div class="rail-section">
-            <div class="section-title"><span>Git</span><button class="icon-btn sm" id="btnPull" type="button" title="git pull --ff-only"><svg><use href="#i-refresh"/></svg></button></div>
+            <div class="section-title"><span>Git</span><span><button class="icon-btn sm" id="btnClonesRail" type="button" title="Склонированные репозитории"><svg><use href="#i-history"/></svg></button><button class="icon-btn sm" id="btnPull" type="button" title="git pull --ff-only"><svg><use href="#i-refresh"/></svg></button></span></div>
             <div id="gitBox" class="git-box"><p class="muted small">Не git-репозиторий.</p></div>
             <button class="btn subtle full" id="btnGitDiff" type="button" disabled><svg><use href="#i-diff"/></svg><span>Дифф с HEAD</span></button>
             <button class="btn subtle full" id="btnCommit" type="button" disabled><svg><use href="#i-git"/></svg><span>Коммит</span></button>
@@ -379,6 +380,21 @@
     </div>
   </div>
 
+
+  <!-- Clones modal -->
+  <div class="modal-backdrop hidden" id="clonesModal" role="dialog" aria-modal="true" aria-labelledby="clonesTitle">
+    <div class="modal wide">
+      <div class="modal-head">
+        <div><span class="section-kicker">/data/repos</span><h2 id="clonesTitle">Склонированные репозитории</h2></div>
+        <button class="icon-btn" data-close="clonesModal" type="button" title="Закрыть"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <div class="backup-list" id="clonesList"></div>
+      <p class="hint" id="clonesHint"></p>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close="clonesModal" type="button">Закрыть</button>
+      </div>
+    </div>
+  </div>
   <!-- Encrypt modal -->
   <div class="modal-backdrop hidden" id="encryptModal" role="dialog" aria-modal="true" aria-labelledby="encryptTitle">
     <div class="modal">
@@ -456,7 +472,7 @@
   <script src="/vendor/codemirror/addon/display/placeholder.min.js"></script>
   <script src="/vendor/js-yaml.min.js"></script>
   <script src="/vendor/diff.min.js"></script>
-  <script src="/i18n.js?v=14"></script>
-  <script src="/app.js?v=30"></script>
+  <script src="/i18n.js?v=15"></script>
+  <script src="/app.js?v=31"></script>
 </body>
 </html>

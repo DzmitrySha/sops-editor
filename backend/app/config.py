@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     request_timeout: float = 60.0
 
     allow_git_clone: bool = True
+    # Clones under /data/repos are removed after this many days without use.
+    # 0 disables automatic cleanup; manual deletion remains available.
+    git_clone_ttl_days: int = Field(default=7, ge=0)
     git_token: SecretStr | None = None
     git_username: str = "oauth2"
     # Empty = any host. Comma/space separated host names.

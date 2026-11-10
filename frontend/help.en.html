@@ -203,6 +203,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
         </table>
         <p>For private HTTPS repositories set <code>SOPS_EDITOR_GIT_TOKEN</code> (GitLab: <code>oauth2</code>, GitHub: <code>x-access-token</code>); the token never comes from the UI. For SSH, host <code>~/.ssh</code> is mounted read-only at <code>/ssh</code> and a private key is auto-detected (or set <code>SOPS_EDITOR_GIT_SSH_KEY</code>). Both <code>git@host:group/repo.git</code> and <code>ssh://git@host:port/group/repo.git</code> work. Clone hosts can be restricted with <code>SOPS_EDITOR_GIT_ALLOWED_HOSTS</code>.</p>
         <p>If a <strong>folder</strong> is given (e.g. <code>infra</code>), the server uses partial clone + sparse checkout: only that folder and root files such as <code>.sops.yaml</code> are downloaded, not the whole repository.</p>
+        <p>Clones live in <code>/data/repos</code>. <strong>“Cloned repositories”</strong> lists them and lets you delete a clone manually. Unused clones are removed automatically after <code>SOPS_EDITOR_GIT_CLONE_TTL_DAYS</code> days (default 7; <code>0</code> disables automatic cleanup).</p>
       </section>
 
       <section class="doc-section" id="auth">

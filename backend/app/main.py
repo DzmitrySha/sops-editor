@@ -443,7 +443,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             logger.info("sops: {}", sops.version())
         except AppError as exc:
             logger.error("sops недоступен: {}", exc.message)
-        yield
+        if settings.git_clone_ttl_days:
+            try:
+                removed = git.cleanup_clones(settings.git_clone_ttl_days)
+                if removed:
+                    logger.info("Removed stale git clones: {}", ", ".join(removed))
+            except Exception:
+                logger.exception("Git clone cleanup failed")
+        cleanup_task: asyncio.Task[None] | None = None
+        if settings.git_clone_ttl_days:
+            async def cleanup_loop() -> None:
+                while True:
+                    await asyncio.sleep(3600)
+                    try:
+                        git.cleanup_clones(settings.git_clone_ttl_days)
+                    except Exception:
+                        logger.exception("Git clone cleanup failed")
+            cleanup_task = asyncio.create_task(cleanup_loop())
+        try:
+            yield
+        finally:
+            if cleanup_task is not None:
+                cleanup_task.cancel()
+                try:
+                    await cleanup_task
+                except asyncio.CancelledError:
+                    pass
 
     app = FastAPI(
         title=settings.app_name,
@@ -1152,6 +1177,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             result.get("path"),
             result.get("subdir"),
         )
+        return result
+
+    @app.get("/api/git/clones")
+    async def git_clones():
+        return {"clones": git.list_clones(), "ttl_days": settings.git_clone_ttl_days}
+
+    @app.delete("/api/git/clones/{name}")
+    async def git_clone_delete(name: str):
+        result = git.delete_clone(name)
+        logger.info("Deleted clone {}", name)
         return result
 
     # ---------------------------------------------------------------- static
