@@ -785,8 +785,10 @@
     const hasGit = Boolean(state.file && state.file.git);
     $("btnSave").disabled = !hasFile || state.busy;
     $("btnDiff").disabled = !hasFile;
+    $("btnDownloadFile").disabled = !hasFile || state.busy;
     $("btnSave").classList.toggle("hidden", !hasFile);
     $("btnDiff").classList.toggle("hidden", !hasFile);
+    $("btnDownloadFile").classList.toggle("hidden", !hasFile);
     $("btnCommit").disabled = !hasGit || state.busy;
     $("btnPull").disabled = !hasGit || state.busy;
     $("btnGitDiff").disabled = !hasGit || state.busy;
@@ -1289,16 +1291,12 @@
     $("btnDownloadLocal").textContent =
       state.file && state.file.encrypted_file === false ? "Скачать файл" : "Скачать зашифрованный";
     const canWrite = Boolean(state.local.handle);
-    const canAsk = Boolean(window.showOpenFilePicker && window.isSecureContext);
     $("btnWriteLocal").classList.toggle("hidden", !canWrite);
-    $("btnAllowWrite").classList.toggle("hidden", canWrite || !canAsk);
     const hint = $("localWriteHint");
     hint.classList.toggle("hidden", canWrite);
     hint.textContent = canWrite
       ? ""
-      : canAsk
-        ? "Чтобы писать прямо в исходный файл без выбора места при каждом сохранении, один раз разрешите перезапись: выберите тот же файл в диалоге."
-        : "Прямая запись недоступна в этом браузере: скачайте шифротекст и замените файл вручную.";
+      : "Прямая запись в исходный файл недоступна в этом браузере: при сохранении будет предложено скачивание.";
   }
 
   function renderFileChips() {
@@ -1356,36 +1354,22 @@
   }
 
   // -------------------------------------------------------------- local file
-  function pickLocalFile() {
-    // Standard dialog: synchronous, works in every browser and never blocked.
+  async function pickLocalFile() {
     setLocalStatus("");
+    if (window.showOpenFilePicker && window.isSecureContext) {
+      try {
+        const [handle] = await window.showOpenFilePicker({ multiple: false });
+        if (!handle) return;
+        await uploadLocalFile(await handle.getFile(), handle);
+        return;
+      } catch (error) {
+        if (error && error.name === "AbortError") return;
+        // Some browsers expose the API but reject it for this origin; fall
+        // back to a plain <input type=file> and download-on-save.
+        console.warn("File System Access picker failed", error);
+      }
+    }
     $("localFileInput").click();
-  }
-
-  async function allowWriteBack() {
-    if (!state.local) return;
-    if (!window.showOpenFilePicker || !window.isSecureContext) {
-      toast("Прямая запись недоступна", "Браузер не поддерживает File System Access. Скачайте файл и замените вручную.", "warn");
-      return;
-    }
-    try {
-      const [handle] = await window.showOpenFilePicker({
-        multiple: false,
-        suggestedName: state.local.originalName || state.local.name,
-      });
-      if (!handle) return;
-      state.local.handle = handle;
-      renderLocalRail();
-      toast("Перезапись разрешена", "Теперь «Записать в исходный файл» заменит выбранный файл.", "ok");
-    } catch (error) {
-      toast(
-        "Диалог не открылся",
-        error && error.name === "AbortError"
-          ? "Окно выбора закрыто или недоступно в этом браузере."
-          : (error && error.message) || String(error),
-        "warn",
-      );
-    }
   }
 
   function setLocalStatus(text, kind = "", action = null) {
@@ -1445,6 +1429,11 @@
         downloadUrl: payload.download_url,
         handle,
       };
+      if (handle) {
+        // Ask for write access while the picker gesture is fresh. Save will
+        // then overwrite the source file without an extra confirmation.
+        await ensureWritePermission(handle).catch(() => false);
+      }
       await openFile(payload.path, { keepProgress: true });
       if (!state.file || pathKey(state.file.path) !== pathKey(payload.path)) {
         setLocalStatus("Файл загружен, но не расшифрован: задайте приватный ключ в окне «Ключ».", "busy");
@@ -1465,35 +1454,38 @@
     }
   }
 
-  function downloadLocalFile() {
-    if (!state.local) return;
+  function downloadFile(name = "") {
+    if (!state.file) return;
     const link = document.createElement("a");
-    link.href = `/api/download?path=${encodeURIComponent(state.local.path)}`;
-    link.download = state.local.originalName || state.local.name || "secrets.enc.yaml";
+    link.href = `/api/download?path=${encodeURIComponent(state.file.path)}`;
+    link.download = name || state.file.name || "secrets.enc.yaml";
     document.body.append(link);
     link.click();
     link.remove();
-    toast("Скачивание", "Зашифрованный файл сохранён браузером.", "ok");
+    toast("Скачивание", "Файл сохранён браузером.", "ok");
   }
 
-  async function writeLocalFile() {
-    if (!state.local || !state.local.handle) return;
-    const name = state.local.originalName || state.local.name || "файл";
-    const confirmed = await showConfirm({
-      title: "Перезаписать исходный файл?",
-      text: `Файл «${name}» будет заменён зашифрованной версией. Прежнее содержимое файла будет потеряно.`,
-      okLabel: "Перезаписать",
-    });
-    if (!confirmed) return;
-    $("btnWriteLocal").disabled = true;
+  function downloadLocalFile() {
+    if (!state.local) return;
+    downloadFile(state.local.originalName || state.local.name);
+  }
+
+  async function ensureWritePermission(handle) {
+    if (!handle || !handle.queryPermission) return true;
+    let permission = await handle.queryPermission({ mode: "readwrite" });
+    if (permission === "prompt") {
+      permission = await handle.requestPermission({ mode: "readwrite" });
+    }
+    return permission === "granted";
+  }
+
+  async function writeLocalFile({ silent = false } = {}) {
+    if (!state.local || !state.local.handle) return false;
+    if (!silent) $("btnWriteLocal").disabled = true;
     try {
       const handle = state.local.handle;
-      if (handle.queryPermission) {
-        let permission = await handle.queryPermission({ mode: "readwrite" });
-        if (permission !== "granted") {
-          permission = await handle.requestPermission({ mode: "readwrite" });
-        }
-        if (permission !== "granted") throw new Error("браузер не выдал разрешение на запись");
+      if (!(await ensureWritePermission(handle))) {
+        throw new Error("браузер не выдал разрешение на запись");
       }
       const response = await fetch(`/api/download?path=${encodeURIComponent(state.local.path)}`, {
         credentials: "same-origin",
@@ -1509,9 +1501,15 @@
       const writable = await handle.createWritable();
       await writable.write(blob);
       await writable.close();
-      toast("Записано", `Исходный файл ${state.local.originalName || ""} обновлён.`, "ok");
+      if (!silent) {
+        toast("Записано", `Исходный файл ${state.local.originalName || ""} обновлён.`, "ok");
+      }
+      return true;
     } catch (error) {
-      toast("Не удалось записать файл", error.message || String(error), "bad");
+      if (!silent) {
+        toast("Не удалось записать файл", error.message || String(error), "bad");
+      }
+      return false;
     } finally {
       $("btnWriteLocal").disabled = false;
     }
@@ -1705,6 +1703,14 @@
       toast("Не сохранено", "Исправьте синтаксис: сервер отклонит такой документ.", "bad");
       return;
     }
+    let localWriteAllowed = false;
+    if (state.local && state.local.handle) {
+      try {
+        localWriteAllowed = await ensureWritePermission(state.local.handle);
+      } catch {
+        localWriteAllowed = false;
+      }
+    }
     state.busy = true;
     $("btnSave").disabled = true;
     $("btnSave").setAttribute("aria-busy", "true");
@@ -1758,16 +1764,23 @@
       renderGit();
       refreshBackups();
       updateStatus();
-      if (state.file.encrypted_file === false) {
+      let localSaved = "";
+      if (state.local) {
+        if (localWriteAllowed && await writeLocalFile({ silent: true })) {
+          localSaved = "write";
+        } else {
+          downloadLocalFile();
+          localSaved = "download";
+        }
+      }
+      if (localSaved === "write") {
+        toast("Сохранено", "Исходный файл обновлён зашифрованной версией.", "ok");
+      } else if (localSaved === "download") {
+        toast("Сохранено", "Файл скачан — замените им локальную копию.", "ok");
+      } else if (state.file.git) {
+        toast("Сохранено в репозиторий", "Файл обновлён. Нажмите «Коммит», чтобы зафиксировать изменение.", "ok");
+      } else if (state.file.encrypted_file === false) {
         toast("Сохранено", "Открытый файл записан. Кнопка «Зашифровать» создаст SOPS-версию.", "ok");
-      } else if (state.local) {
-        toast(
-          "Сохранено",
-          state.local.handle
-            ? "Можно записать зашифрованный файл обратно в исходный."
-            : "Скачайте зашифрованный файл и замените им локальный.",
-          "ok",
-        );
       } else {
         toast("Сохранено", result.backup ? `Резервная копия: ${result.backup.id}` : "Файл зашифрован обратно.", "ok");
       }
@@ -2651,7 +2664,7 @@
     $("btnEncryptFile").addEventListener("click", () => {
       if (state.file) openEncryptModal({ path: state.file.path, name: state.file.name });
     });
-    $("btnAllowWrite").addEventListener("click", allowWriteBack);
+    $("btnDownloadFile").addEventListener("click", downloadFile);
     $("pickerEncrypt").addEventListener("click", () => {
       const entry = state.picker.selected;
       if (entry && entry.type === "file") openEncryptModal({ path: entry.path, name: entry.name });
