@@ -2090,6 +2090,9 @@
       await api(`/api/git/clones/${encodeURIComponent(item.name)}`, { method: "DELETE" });
       state.clones = state.clones.filter((entry) => entry.name !== item.name);
       renderClones(state.cloneTtlDays);
+      if (state.picker.path && $("pickerModal") && !$("pickerModal").classList.contains("hidden")) {
+        loadBrowse(state.picker.path);
+      }
       toast("Клон удалён", item.name, "ok");
     } catch (error) {
       toast("Не удалось удалить клон", error.message, "bad");
@@ -2442,6 +2445,12 @@
     }
   }
 
+  function isCloneDirectory(entry) {
+    if (!entry || entry.type !== "dir") return false;
+    const parent = pathKey(state.picker.path);
+    return parent === "/data/repos" || parent.endsWith("/data/repos");
+  }
+
   function renderPickerEntries() {
     const holder = $("pickerList");
     holder.innerHTML = "";
@@ -2467,6 +2476,18 @@
       size.className = "size";
       size.textContent = entry.type === "dir" ? "" : formatBytes(entry.size);
       row.append(size);
+      if (isCloneDirectory(entry)) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "icon-btn sm danger";
+        remove.title = "Удалить клон с сервера";
+        remove.innerHTML = '<svg><use href="#i-x"/></svg>';
+        remove.addEventListener("click", (event) => {
+          event.stopPropagation();
+          deleteClone(entry);
+        });
+        row.append(remove);
+      }
       row.addEventListener("click", () => {
         holder.querySelectorAll(".picker-row.selected").forEach((el) => el.classList.remove("selected"));
         row.classList.add("selected");
