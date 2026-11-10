@@ -2064,7 +2064,7 @@
       remove.type = "button";
       remove.className = "icon-btn sm danger";
       remove.title = "Удалить клон с сервера";
-      remove.innerHTML = '<svg><use href="#i-x"/></svg>';
+      remove.innerHTML = '<svg><use href="#i-trash"/></svg>';
       remove.addEventListener("click", () => deleteClone(item));
       row.append(name, meta, remove);
       holder.append(row);
@@ -2481,7 +2481,7 @@
         remove.type = "button";
         remove.className = "icon-btn sm danger";
         remove.title = "Удалить клон с сервера";
-        remove.innerHTML = '<svg><use href="#i-x"/></svg>';
+        remove.innerHTML = '<svg><use href="#i-trash"/></svg>';
         remove.addEventListener("click", (event) => {
           event.stopPropagation();
           deleteClone(entry);
