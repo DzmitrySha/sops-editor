@@ -152,12 +152,12 @@ gpg --decrypt secrets.enc.yaml                    # PGP, if the key is in the ke
         <h2>4. File from your computer (local git clone)</h2>
         <ol>
           <li>Open the <strong>“From computer”</strong> tab.</li>
-          <li>Press <strong>“Choose file”</strong> (standard browser dialog — always works) or drag a file into the drop zone. A status line appears under the button: name, size, stage (“Uploading…” / error / “opened”). An <strong>unencrypted</strong> YAML/JSON/dotenv/INI file also opens in the editor; the <strong>“Encrypt”</strong> button in the editor creates the SOPS version.</li>
+          <li>Press <strong>“Choose file”</strong>. Chrome/Edge opens the File System Access picker: the app remembers the file and Save overwrites exactly it. Other browsers use a plain <code>&lt;input type=file&gt;</code>, so the result must be downloaded. An <strong>unencrypted</strong> YAML/JSON/dotenv/INI file also opens in the editor; the <strong>“Encrypt”</strong> button creates the SOPS version.</li>
           <li>If there is no server key, the “Key” window opens — paste your <code>AGE-SECRET-KEY-1…</code> (or load a <code>.txt</code> with the key). The file opens automatically afterwards.</li>
-          <li>Edit the secrets and press <strong>“Save”</strong> (<kbd>Ctrl</kbd>+<kbd>S</kbd>). The server encrypts and verifies the result.</li>
-          <li>Take the result: <strong>“Download encrypted”</strong> — the browser saves the file under its original name; <strong>“Write to source file”</strong> — in Chrome/Edge writes the ciphertext straight into the chosen file and asks only for overwrite confirmation (no second location prompt).</li>
+          <li>Edit the secrets and press <strong>“Save”</strong> (<kbd>Ctrl</kbd>+<kbd>S</kbd>). The server encrypts and verifies the result, then immediately writes it back to the original path. If the browser denies write access, the encrypted file is downloaded so you can replace the local copy.</li>
+          <li>If the file is inside a local git repository, commit it with your own <code>git</code> after the overwrite (or use a mounted <code>/workspace</code>, where commit/push are available in the UI).</li>
         </ol>
-        <div class="doc-note"><p>Direct writing requires the browser to remember the file. The <strong>“Allow overwriting the file…”</strong> button in the left panel asks you to pick the same file once — the handle is kept until the tab is reloaded; after that “Write to source file” only asks for confirmation. If the browser does not support the API, only “Download encrypted” and manual replacement are available.</p></div>
+        <div class="doc-note"><p>Direct overwrite requires the File System Access API (Chrome/Edge). The permission prompt appears once; there is no separate “Allow overwriting” button. Without the API, the <strong>“Download”</strong> button saves the file manually.</p></div>
         <p>What happens on the server: the uploaded file is stored in <code>/data/uploads/&lt;tab id&gt;/&lt;random dir&gt;/name</code>, decrypted in memory, and after saving downloaded back already encrypted. Directories older than 7 days are removed automatically.</p>
         <p>Browser limitation: the full local path is not exposed, so the tool works with the chosen file, not the whole folder. For a repository, mount it into <code>/workspace</code>.</p>
       </section>
@@ -168,6 +168,8 @@ gpg --decrypt secrets.enc.yaml                    # PGP, if the key is in the ke
           <li><strong>Path manually:</strong> <code>/workspace/secrets/app.enc.yaml</code> — a path inside the container.</li>
           <li><strong>Browse:</strong> “Browse” opens the tree of allowed directories; double-click to enter/open, “Search the tree” to find by name.</li>
           <li><strong>From git:</strong> the “From git” tab → URL and branch → “Clone to /data/repos”. The directory browser opens right after cloning.</li>
+          <li><strong>Save:</strong> writes the file back to the same path. If it is inside a git repository, press <strong>“Commit”</strong> afterwards (enable push if needed).</li>
+          <li><strong>Download:</strong> the <strong>“Download”</strong> button in the top bar works for any open file; an encrypted SOPS file is downloaded as ciphertext.</li>
         </ul>
         <p>Allowed directories are set by <code>SOPS_EDITOR_ROOTS</code> (separated by <code>|</code>) and listed on the start screen; clicking one opens the browser.</p>
       </section>
