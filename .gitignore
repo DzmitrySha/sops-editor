@@ -12,7 +12,6 @@ workspace/*
 !workspace/examples/
 storage/
 .ssh-host/
-.gitconfig-host/
 *.log
 logs/
 backups/

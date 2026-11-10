@@ -64,7 +64,7 @@ def test_git_status_commit_and_push_rejection(client, workspace):
     assert second.json()["reason"] == "no_changes"
 
 
-def test_commit_uses_user_identity_and_adds_tool_trailer(client, workspace):
+def test_commit_uses_fixed_server_identity_and_adds_tool_trailer(client, workspace):
     root = workspace["root"]
     git(root, "init", "-b", "main")
     git(root, "config", "user.name", "Tester")
@@ -91,6 +91,7 @@ def test_commit_uses_user_identity_and_adds_tool_trailer(client, workspace):
             "path": str(workspace["target"]),
             "message": "rotate demo secret",
             "push": False,
+            # Old clients used to send these; the server must ignore them.
             "author_name": "Дмитрий Шаповалов",
             "author_email": "d.shapovalov@example.net",
         },
@@ -103,10 +104,11 @@ def test_commit_uses_user_identity_and_adds_tool_trailer(client, workspace):
         "--format=%an%x00%ae%x00%cn%x00%ce%x00%B",
     )
     parts = raw.split("\x00")
-    assert parts[0] == "Дмитрий Шаповалов"
-    assert parts[1] == "d.shapovalov@example.net"
-    assert parts[2] == "Дмитрий Шаповалов"
-    assert parts[3] == "d.shapovalov@example.net"
+    expected = workspace["settings"]
+    assert parts[0] == expected.git_author_name
+    assert parts[1] == expected.git_author_email
+    assert parts[2] == expected.git_author_name
+    assert parts[3] == expected.git_author_email
     assert parts[4].startswith("rotate demo secret")
     assert "Made-with: SOPS Editor" in parts[4]
 

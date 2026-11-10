@@ -196,10 +196,12 @@ grep 'public key' age.txt   # этого получателя добавьте �
 ## Git
 
 - **Коммит** — `git add -- <файл>` + `git commit -- <файл>`; только текущий файл.
-  Автор и committer — имя/email из полей коммита (предзаполняются из host
-  `~/.gitconfig`, смонтированного в `/gitconfig`). Email должен совпадать с
-  подтверждённым email в GitLab, иначе коммит не привяжется к пользователю.
-  В сообщение автоматически добавляется трейлер `Made-with: SOPS Editor`.
+  Автор и committer жёстко задаются на сервере через
+  `SOPS_EDITOR_GIT_AUTHOR_NAME` / `SOPS_EDITOR_GIT_AUTHOR_EMAIL`; в UI полей
+  личности нет. Email должен совпадать с подтверждённым email сервисного
+  аккаунта GitLab, иначе коммит не привяжется к пользователю; при push rules
+  с требованием verified email push может быть отклонён. В сообщение
+  автоматически добавляется трейлер `Made-with: SOPS Editor`.
 - **Push** — `git push`; для HTTPS задайте `SOPS_EDITOR_GIT_TOKEN` (GitLab `oauth2`),
   для SSH смонтируйте ключ/agent.
 - **SSH** — host `~/.ssh` монтируется read-only в `/ssh`; приватный ключ
@@ -212,6 +214,11 @@ grep 'public key' age.txt   # этого получателя добавьте �
   используется partial clone + sparse checkout: скачивается только она и
   корневые файлы вроде `.sops.yaml`, а не весь репозиторий.
 - **Pull** — только `--ff-only` и только при чистом worktree.
+- **Аудит IP** — при открытии UI (`/`, `/help.html`) в `/data/logs/sops-editor.log`
+  пишется `UI opened from <IP> ...`; изменения (`POST`/`PUT`/`PATCH`/`DELETE`)
+  логируются с IP и пользователем из auth. За обратным прокси задайте
+  `SOPS_EDITOR_TRUST_PROXY=true`, чтобы брался первый адрес
+  `X-Forwarded-For`; без прокси пишется адрес TCP-соединения.
 
 ## Деплой: Docker и NeuroAI k8s
 
@@ -275,7 +282,8 @@ git push origin v0.1.0
 | `SOPS_EDITOR_GIT_ALLOWED_HOSTS` | пусто | allowlist хостов для клона |
 | `SOPS_EDITOR_GIT_TOKEN` | пусто | HTTPS-токен git |
 | `SOPS_EDITOR_HOST_SSH_DIR` | `./.ssh-host` | host-каталог `~/.ssh`, монтируется в `/ssh` |
-| `SOPS_EDITOR_HOST_GITCONFIG` | `./.gitconfig-host` | host `~/.gitconfig` для предзаполнения автора |
+| `SOPS_EDITOR_GIT_AUTHOR_NAME` | `sops-editor` | фиксированное имя автора/committer |
+| `SOPS_EDITOR_GIT_AUTHOR_EMAIL` | `sopseditor@vitebsk.energo.net` | фиксированный email автора/committer |
 | `SOPS_EDITOR_GIT_SSH_KEY` | пусто | явный ключ в контейнере; пусто = автопоиск |
 | `SOPS_EDITOR_GIT_SSH_STRICT_HOST_KEY_CHECKING` | `accept-new` | `accept-new` · `yes` · `no` |
 | `SOPS_EDITOR_KEYSTORE_KEY` | пусто | мастер-ключ Fernet для серверного хранилища |

@@ -64,10 +64,9 @@ class Settings(BaseSettings):
     git_username: str = "oauth2"
     # Empty = any host. Comma/space separated host names.
     git_allowed_hosts: str = ""
-    git_author_name: str = "SOPS Editor"
-    git_author_email: str = "sops-editor@localhost"
-    # Optional host ~/.gitconfig mounted read-only for author/committer prefill.
-    git_config_global: str = "/gitconfig"
+    # Fixed commit identity; the UI cannot override it.
+    git_author_name: str = "sops-editor"
+    git_author_email: str = "sopseditor@vitebsk.energo.net"
 
     # SSH git. ``/ssh`` is the read-only mount of the host's ~/.ssh.
     # A private key is auto-detected there unless git_ssh_key is set.

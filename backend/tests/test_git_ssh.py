@@ -74,25 +74,6 @@ def test_ssh_url_detection_and_key_copy(tmp_path: Path):
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def test_default_identity_from_mounted_gitconfig(tmp_path: Path):
-    config = tmp_path / "gitconfig"
-    config.write_text(
-        "[user]\n\tname = Alice Example\n\temail = alice@example.net\n",
-        encoding="utf-8",
-    )
-    settings = Settings(
-        roots=str(tmp_path),
-        storage=str(tmp_path / "storage"),
-        git_config_global=str(config),
-    )
-    service = GitService(settings)
-    assert service.default_identity() == {
-        "name": "Alice Example",
-        "email": "alice@example.net",
-        "source": "gitconfig",
-    }
-
-
 def test_explicit_missing_ssh_key_is_reported(tmp_path: Path):
     settings = Settings(
         roots=str(tmp_path),

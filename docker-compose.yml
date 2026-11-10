@@ -45,11 +45,6 @@ services:
         source: ${SOPS_EDITOR_HOST_SSH_DIR:-./.ssh-host}
         target: /ssh
         read_only: true
-      # Host ~/.gitconfig is read only for author/committer prefill in the UI.
-      - type: bind
-        source: ${SOPS_EDITOR_HOST_GITCONFIG:-./.gitconfig-host}
-        target: /gitconfig
-        read_only: true
     read_only: true
     tmpfs:
       - /tmp:size=256m,mode=1777
