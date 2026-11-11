@@ -13,7 +13,6 @@ keys
 workspace
 storage
 .ssh-host
-.gitconfig-host
 frontend/vendor/**/*.map
 *.log
 .github

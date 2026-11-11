@@ -66,7 +66,7 @@ Open a file from a git checkout, a cloned repository or your own computer — it
 | **Keys, four ways** | Fernet-encrypted server store (replace-only, never readable back), server key file, environment/`SOPS_AGE_KEY`, or a key pasted in the UI (process memory only, TTL 8 h, bound to the tab cookie). Missing key? The dialog shows the recipients from the file metadata. |
 | **Live changes pane** | A toolbar toggle splits the editor: the second pane shows only the changed regions (old lines red, new green, 3 lines of context) and keeps up with typing and scrolling. A separate window compares the working file with `HEAD`, decrypted and side by side. |
 | **Visible progress** | Opening, uploading and saving show the real phases (path check, SOPS metadata, `sops decrypt`, format detection, git) with an elapsed timer — no dead spinners. |
-| **Git built in** | Branch/file status, commit author/committer from GitLab identity, `Made-with: SOPS Editor` trailer, push, `pull --ff-only`, HTTPS/SSH clone and sparse checkout of a single folder. |
+| **Git built in** | Branch/file status, fixed server-side author/committer identity, `Made-with: SOPS Editor` trailer, push, `pull --ff-only`, HTTPS/SSH clone, sparse checkout and clone deletion with TTL cleanup. |
 | **Bilingual** | RU/EN switch in the header; the documentation follows the language and the theme. |
 | **One container** | FastAPI serves the API and the static UI. No nginx, no build step, no Node on the server. |
 
@@ -198,13 +198,22 @@ At any moment the file on disk is either the old or the new ciphertext.
 ## Git
 
 - **Commit** — `git add -- <file>` + `git commit -- <file>`; only the current file.
-  Name/email fields set author and committer and must match a verified GitLab email;
-  the app appends `Made-with: SOPS Editor`.
+  Author and committer are fixed on the server by
+  `SOPS_EDITOR_GIT_AUTHOR_NAME` / `SOPS_EDITOR_GIT_AUTHOR_EMAIL`; the UI has no
+  editable identity fields. The email should belong to a verified GitLab service
+  account, otherwise the commit is unverified and push rules may reject it.
+  The app appends `Made-with: SOPS Editor`.
 - **Push** — `git push`; for HTTPS set `SOPS_EDITOR_GIT_TOKEN` (GitLab `oauth2`,
   GitHub `x-access-token`), for SSH mount a key/agent.
 - **Clone** — HTTPS or SSH URL + branch + optional folder into `/data/repos/<name>`.
   A folder uses partial clone + sparse checkout (only that folder and root config).
+  Clones can be deleted from the file picker or the clones dialog; unused clones
+  expire after `SOPS_EDITOR_GIT_CLONE_TTL_DAYS` days (`0` disables cleanup).
 - **Pull** — `--ff-only`, only with a clean worktree.
+- **Audit** — opening the UI writes `UI opened from <IP>` to
+  `/data/logs/sops-editor.log`; mutating requests log the client IP and
+  authenticated user. Behind a proxy set `SOPS_EDITOR_TRUST_PROXY=true` to use
+  the first `X-Forwarded-For` hop.
 
 ## Deploy on a server behind Traefik
 
@@ -245,6 +254,9 @@ standard `SOPS_AGE_KEY_FILE` / `SOPS_AGE_KEY`):
 | `SOPS_EDITOR_BACKUP_KEEP` | `10` | ciphertext copies per file |
 | `SOPS_EDITOR_SESSION_TTL_SECONDS` | `28800` | UI key TTL |
 | `SOPS_EDITOR_ALLOW_GIT_CLONE` | `true` | allow cloning |
+| `SOPS_EDITOR_GIT_CLONE_TTL_DAYS` | `7` | remove unused clones; `0` disables cleanup |
+| `SOPS_EDITOR_GIT_AUTHOR_NAME` | `sops-editor` | fixed author/committer name |
+| `SOPS_EDITOR_GIT_AUTHOR_EMAIL` | `sopseditor@vitebsk.energo.net` | fixed author/committer email |
 | `SOPS_EDITOR_GIT_ALLOWED_HOSTS` | empty | clone host allowlist |
 | `SOPS_EDITOR_GIT_TOKEN` | empty | HTTPS git token |
 | `SOPS_EDITOR_TRUST_PROXY` / `_COOKIE_SECURE` | `false` | behind a reverse proxy |

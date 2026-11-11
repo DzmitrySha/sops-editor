@@ -138,12 +138,10 @@ curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status | grep ali
   that is usually root (Compose default); otherwise set `user:` and the directory
   owner.
 - `/keys` is mounted read-only. `age.txt` must be readable by the container.
-- The git repository in `/workspace` should have `user.name/email` configured;
-  otherwise the server falls back to `SOPS_EDITOR_GIT_AUTHOR_NAME/EMAIL`.
-- Commit identity: mount host `~/.gitconfig` read-only as `/gitconfig`
-  (`SOPS_EDITOR_HOST_GITCONFIG=$HOME/.gitconfig`) to prefill the author name/email
-  in the UI. The user can edit both fields; email must match a verified GitLab
-  email. The app appends `Made-with: SOPS Editor` to the commit message.
+- Commit identity is fixed by `SOPS_EDITOR_GIT_AUTHOR_NAME/EMAIL`; the UI cannot
+  override it. The server sets both author and committer, ignoring repository-local
+  `user.name/email`. Use a verified service-account email for strict GitLab push
+  rules. The app appends `Made-with: SOPS Editor` to the commit message.
 - Git SSH: set `SOPS_EDITOR_HOST_SSH_DIR=$HOME/.ssh` (Compose mounts it
   read-only at `/ssh`). A private `id_ed25519`/`id_ecdsa`/`id_rsa` is
   auto-detected; override with `SOPS_EDITOR_GIT_SSH_KEY=/ssh/<key>`. The key is
