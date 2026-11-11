@@ -8,7 +8,7 @@ spec:
     - name: cilium-gateway
       namespace: kube-system
   hostnames:
-    - ai-sops-editor.vitebsk.energo.net
+    - sops-editor.example.com
   rules:
     - matches:
         - path:

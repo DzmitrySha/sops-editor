@@ -468,12 +468,12 @@ class GitService:
         text = stderr.decode("utf-8", errors="replace").lower()
         if "permission denied" in text and "publickey" in text:
             return (
-                "SSH: GitLab не принял ключ. Смонтируйте host ~/.ssh в /ssh "
+                "SSH: git-хост не принял ключ. Смонтируйте host ~/.ssh в /ssh "
                 "или добавьте ключ как deploy key с доступом на запись."
             )
         if "host key verification failed" in text or "remote host identification has changed" in text:
             return (
-                "SSH: host key не прошёл проверку. Добавьте GitLab в "
+                "SSH: host key не прошёл проверку. Добавьте git-хост в "
                 "known_hosts или задайте SOPS_EDITOR_GIT_SSH_STRICT_HOST_KEY_CHECKING=accept-new."
             )
         if "could not resolve hostname" in text:
@@ -483,7 +483,7 @@ class GitService:
                 "SSH: ключ защищён паролем, контейнер не может его запросить. "
                 "Используйте ssh-agent или отдельный deploy key без пароля."
             )
-        return "git clone по SSH не удался. Проверьте ключ, known_hosts и доступ к GitLab."
+        return "git clone по SSH не удался. Проверьте ключ, known_hosts и доступ к git-хосту."
 
 
     # ---------------------------------------------------------------- clones

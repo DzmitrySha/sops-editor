@@ -8,5 +8,5 @@ resources:
 generators:
   - secret-generator.yaml
 images:
-  - name: ai-registry.vitebsk.energo.net/ai-sops-editor/ai-sops-editor
+  - name: registry.example.com/ai-sops-editor/ai-sops-editor
     newTag: 0.0.2

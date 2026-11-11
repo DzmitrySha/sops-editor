@@ -1,20 +1,26 @@
 # Offline / lab build
 
-Корневой [`.gitlab-ci.yml`](../.gitlab-ci.yml) — только ai-opo GitOps
-(`tag → decide → BuildKit/retag → bump`). Offline-сборка не входит в root CI.
+Сборка образа требует доступа в интернет (`sops`, `age`, pip-зависимости). Для
+контура без сети образ собирают заранее и переносят.
 
-Конфиг проекта: [`.offline-docker.json`](../.offline-docker.json).
+В репозитории есть заготовка:
 
-```powershell
-$od = "D:\opo\NeuroAI\offline-docker-cli\offline-docker.cmd"
-& $od discover -p .
-& $od download-offline-cache -p .
-& $od build-offline -p .
-& $od up-offline -p .
+- [`docker-compose.offline.yml`](../docker-compose.offline.yml) — overlay с
+  `pull_policy: never`;
+- [`.offline-docker.json`](../.offline-docker.json) — конфиг описания сборки
+  (образы, системные пакеты, compose-файлы) для внешнего офлайн-сборщика.
+
+```bash
+# на машине с интернетом
+docker compose --env-file docker/.env --env-file docker/.env.secrets build
+docker save ai-sops-editor:local -o ai-sops-editor.tar
+
+# на офлайн-машине
+docker load -i ai-sops-editor.tar
+docker compose -f docker-compose.yml -f docker-compose.offline.yml \
+  --env-file docker/.env --env-file docker/.env.secrets up -d
 ```
 
-Образ локальной сборки — `ai-sops-editor:local` (compose). Offline-кэш —
-`offline-cache/`, он gitignored. Для обновления образа на offline VM:
-`git pull`, затем `build-offline`/`up-offline`.
-
-Этот контур не связан с тегом и Argo.
+Образ локальной сборки — `ai-sops-editor:local`. Кэш офлайн-сборки — каталог
+`offline-cache/` (gitignored). GitHub Actions в этом репозитории только
+проверяет код и собирает образ без публикации.

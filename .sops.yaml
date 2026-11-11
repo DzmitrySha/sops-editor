@@ -1,5 +1,5 @@
-# SOPS for NeuroAI ai-opo.
-# Public age recipient: shared argocd/sops-age (same as ai-template).
+# SOPS rules for the Kubernetes manifests under infra/k8s.
+# Public age recipient: the shared Argo CD key (argocd/sops-age).
 # Path rules handle both Unix and Windows absolute paths.
 creation_rules:
   - path_regex: .*[/\\]infra[/\\]k8s[/\\].*secret.*\.ya?ml$

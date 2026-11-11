@@ -195,7 +195,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
         <table class="doc-table">
           <thead><tr><th>Button</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td>Commit</td><td><code>git add -- file</code> + <code>git commit -- file</code>; only the open file is committed. Author and committer are fixed on the server by <code>SOPS_EDITOR_GIT_AUTHOR_NAME</code>/<code>_EMAIL</code> and cannot be edited in the UI; the email should match a verified GitLab service account. <code>Made-with: SOPS Editor</code> is appended to the message. The “push” checkbox pushes after the commit.</td></tr>
+            <tr><td>Commit</td><td><code>git add -- file</code> + <code>git commit -- file</code>; only the open file is committed. Author and committer are fixed on the server by <code>SOPS_EDITOR_GIT_AUTHOR_NAME</code>/<code>_EMAIL</code> and cannot be edited in the UI; the email should match a verified service account on your git host. <code>Made-with: SOPS Editor</code> is appended to the message. The “push” checkbox pushes after the commit.</td></tr>
             <tr><td>↻ (pull)</td><td><code>git pull --ff-only</code>, only with a clean worktree. The file is reloaded after the pull.</td></tr>
             <tr><td>Diff with HEAD</td><td>Opens the “Changes” window straight on the “With HEAD” tab: the server decrypts the <code>HEAD</code> version and the current file, and they are shown side by side in two columns with line numbers. Both sides are decrypted in the server process; the browser receives plaintext, exactly as when opening the file.</td></tr>
             <tr><td>From git</td><td><code>git clone</code> into <code>/data/repos/&lt;name&gt;</code>; optional subfolder.</td></tr>

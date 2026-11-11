@@ -4,98 +4,104 @@
 
 <h1>SOPS Editor</h1>
 
-Веб-редактор секретов, зашифрованных <a href="https://getsops.io/">SOPS</a>.<br>
-Файл из git-чекаута, склонированного репозитория или с вашего компьютера расшифровывается **в памяти**, редактируется в настоящем редакторе и сохраняется обратно **зашифрованным** — с теми же получателями и правилами `.sops.yaml`.
+A web editor for secrets encrypted with <a href="https://github.com/getsops/sops">SOPS</a>.<br>
+Open a file from a git checkout, a cloned repository or your own computer — it is decrypted **in memory**, edited in a real code editor and saved back **encrypted**, with the same recipients and `.sops.yaml` rules.
 
+<a href="https://github.com/DzmitrySha/sops-editor/actions/workflows/ci.yml"><img src="https://github.com/DzmitrySha/sops-editor/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2dd4bf?style=flat-square" alt="License: MIT"></a>
-<img src="https://img.shields.io/badge/python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+">
+<a href="backend/pyproject.toml"><img src="https://img.shields.io/badge/python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+"></a>
 <img src="https://img.shields.io/badge/FastAPI-0.162-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
 <img src="https://img.shields.io/badge/SOPS-3.13-8a2be2?style=flat-square" alt="SOPS 3.13">
 <img src="https://img.shields.io/badge/age-1.3-00b3a4?style=flat-square" alt="age 1.3">
 <img src="https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
-<img src="https://img.shields.io/badge/i18n-RU%20%2F%20EN-22c55e?style=flat-square" alt="RU / EN">
+<img src="https://img.shields.io/badge/i18n-EN%20%2F%20RU-22c55e?style=flat-square" alt="EN / RU">
 
-<sub>Русская версия · <a href="docs/ru/DEPLOY.md">Деплой</a> · <a href="docs/ru/SECURITY.md">Безопасность</a></sub>
+<img src="https://img.shields.io/github/stars/DzmitrySha/sops-editor?style=flat-square&color=f5b301" alt="Stars">
+<img src="https://img.shields.io/github/forks/DzmitrySha/sops-editor?style=flat-square" alt="Forks">
+<img src="https://img.shields.io/github/issues/DzmitrySha/sops-editor?style=flat-square" alt="Issues">
+<img src="https://img.shields.io/github/issues-pr/DzmitrySha/sops-editor?style=flat-square" alt="Pull requests">
+<img src="https://img.shields.io/github/last-commit/DzmitrySha/sops-editor?style=flat-square" alt="Last commit">
+<img src="https://img.shields.io/github/commit-activity/m/DzmitrySha/sops-editor?style=flat-square" alt="Commit activity">
+<img src="https://img.shields.io/github/repo-size/DzmitrySha/sops-editor?style=flat-square" alt="Repo size">
+<img src="https://img.shields.io/github/languages/code-size/DzmitrySha/sops-editor?style=flat-square" alt="Code size">
+
+<sub>English · <a href="README.ru.md">Русская версия</a> · <a href="docs/DEPLOY.md">Deployment</a> · <a href="SECURITY.md">Security</a></sub>
 
 </div>
 
 ---
 
-| Тёмная тема | Светлая тема |
+| Dark | Light |
 |---|---|
-| ![Редактор, тёмная тема](docs/screenshots/ru/home-dark.png) | ![Редактор, светлая тема](docs/screenshots/ru/home-light.png) |
-| ![Редактор YAML](docs/screenshots/ru/editor-dark.png) | ![Встроенная документация](docs/screenshots/ru/help-dark.png) |
+| ![Editor, dark theme](docs/screenshots/en/home-dark.png) | ![Editor, light theme](docs/screenshots/en/home-light.png) |
+| ![File open in the editor](docs/screenshots/en/editor-dark.png) | ![Built-in documentation](docs/screenshots/en/help-dark.png) |
 
-## Содержание
+## Contents
 
-- [Ключевые возможности](#ключевые-возможности)
-- [Как это работает](#как-это-работает)
-- [Быстрый старт](#быстрый-старт)
-- [Примеры файлов](#примеры-файлов)
-- [Файлы с компьютера](#файлы-с-компьютера)
-- [Ключи](#ключи)
-- [Как устроено сохранение](#как-устроено-сохранение)
+- [Highlights](#highlights)
+- [How it works](#how-it-works)
+- [Quick start](#quick-start)
+- [Try it with the demo files](#try-it-with-the-demo-files)
+- [Files from your computer](#files-from-your-computer)
+- [Keys](#keys)
+- [How saving works](#how-saving-works)
 - [Git](#git)
-- [Деплой: Docker и NeuroAI k8s](#деплой-docker-и-neuroai-k8s)
-- [Настройки](#настройки)
+- [Deploy on a server behind Traefik](#deploy-on-a-server-behind-traefik)
+- [Configuration](#configuration)
 - [HTTP API](#http-api)
-- [Разработка и тесты](#разработка-и-тесты)
-- [Структура проекта](#структура-проекта)
-- [Планы](#планы)
-- [Лицензия](#лицензия)
+- [Development and tests](#development-and-tests)
+- [Project structure](#project-structure)
+- [Roadmap](#roadmap)
+- [License](#license)
 
-## Ключевые возможности
+## Highlights
 
 | | |
 |---|---|
-| **Сохранение через SOPS** | Запись идёт через `sops edit`: мастер-ключи, MAC, `encrypted_regex` и остальные правила **исходного** файла сохраняются. Инструмент не пересобирает файл «с другими получателями». |
-| **Открытый текст только в памяти** | Расшифровка — в процессе сервера и браузера. Резервные копии и загрузки — шифротекст; временный payload для `sops edit` — файл `0600` в каталоге `0700`, удаляется в `finally`. |
-| **Проверяемая запись** | Перед сохранением SHA-256 сравнивается с тем, что видел браузер (защита от перезаписи чужой правки). После — файл расшифровывается снова и сверяется с отправленным; при ошибке оригинал восстанавливается. |
-| **Обычные файлы тоже** | Открытый YAML / JSON / dotenv / INI открывается без ключа, кнопка **«Зашифровать»** создаёт SOPS-версию — по `.sops.yaml`, явному age-получателю или серверному ключу. |
-| **Настоящий редактор** | CodeMirror с подсветкой YAML/JSON, поиском, сворачиванием, `Ctrl+S`, валидацией синтаксиса и деревом секретов с переходом по строке. |
-| **Ключи — четыре способа** | Зашифрованное серверное хранилище (обновление без чтения), файл на сервере, переменные `SOPS_AGE_KEY`/`SOPS_AGE_KEY_FILE` или ключ, вставленный в UI (только в памяти процесса, TTL 8 ч, привязан к cookie вкладки). Нет ключа? Диалог покажет получателей из метаданных файла. |
-| **Панель изменений** | Переключатель в тулбаре делит редактор: вторая панель показывает только изменённые участки (старые строки красным, новые зелёным, по 3 строки контекста) и обновляется по мере ввода и прокрутки. Отдельное окно сравнивает файл с `HEAD` — расшифрованно и рядом. |
-| **Видимый прогресс** | Открытие, загрузка и сохранение показывают реальные фазы (проверка пути, метаданные SOPS, `sops decrypt`, формат, git) и таймер, а не «вечный» спиннер. |
-| **Git внутри** | Статус ветки и файла, коммит только текущего файла, push, `pull --ff-only`, клонирование по HTTPS или SSH в `/data/repos`; необязательная папка — sparse checkout только её. |
-| **Два языка** | Переключатель RU/EN в шапке; справка следует за языком и темой. |
-| **Один контейнер** | FastAPI отдаёт API и статический интерфейс. Без nginx, без сборки, без Node на сервере. |
+| **SOPS-native saving** | Saving goes through `sops edit`: master keys, MAC, `encrypted_regex` and every other rule of the *original* file are preserved. The tool never "re-encrypts with different recipients". |
+| **Plaintext in memory only** | Decrypt happens in the process and in the browser. Backups and uploads are ciphertext; the temporary payload for `sops edit` is a `0600` file that is removed in `finally`. |
+| **Verified writes** | Before saving, the file's SHA-256 is compared with what the browser saw (protection against clobbering someone else's edit). After saving, the result is decrypted again and compared with the submitted data; on mismatch the original is restored. |
+| **Plain files too** | A plain YAML / JSON / dotenv / INI file opens without a key; the **Encrypt** button creates a SOPS version — with `.sops.yaml`, an explicit age recipient or the server key. |
+| **Real editor** | CodeMirror with YAML/JSON highlighting, search, folding, `Ctrl+S`, live syntax validation and a masked secret tree that jumps to a line. |
+| **Keys, four ways** | Fernet-encrypted server store (replace-only, never readable back), server key file, environment/`SOPS_AGE_KEY`, or a key pasted in the UI (process memory only, TTL 8 h, bound to the tab cookie). Missing key? The dialog shows the recipients from the file metadata. |
+| **Live changes pane** | A toolbar toggle splits the editor: the second pane shows only the changed regions (old lines red, new green, 3 lines of context) and keeps up with typing and scrolling. A separate window compares the working file with `HEAD`, decrypted and side by side. |
+| **Visible progress** | Opening, uploading and saving show the real phases (path check, SOPS metadata, `sops decrypt`, format detection, git) with an elapsed timer — no dead spinners. |
+| **Git built in** | Branch/file status, fixed server-side author/committer identity, `Made-with: SOPS Editor` trailer, push, `pull --ff-only`, HTTPS/SSH clone, sparse checkout and clone deletion with TTL cleanup. |
+| **Bilingual** | RU/EN switch in the header; the documentation follows the language and the theme. |
+| **One container** | FastAPI serves the API and the static UI. No nginx, no build step, no Node on the server. |
 
-## Как это работает
+## How it works
 
 ```mermaid
 flowchart LR
-  dev[Разработчик] -->|HTTPS + Basic auth| web[ai-sops-editor]
-  web -->|SOPS decrypt/edit in memory| key[(серверный ключ<br/>Fernet keyring /data)]
-  web -->|commit + push| gl[(GitLab<br/>канонический репозиторий)]
-  gl -->|git tag| ci[GitLab CI<br/>BuildKit / retag]
-  ci -->|image| reg[(ai-registry)]
-  ci -->|bump newTag| argo[Argo CD]
-  argo -->|GitOps Sync| k8s[ai-opo<br/>namespace ai-sops-editor]
-  k8s -->|HTTPS| users[Пользователи]
-  web -.->|clones/uploads/backups| pvc[(PVC /data)]
+  dev[Developer] -->|HTTPS + Basic auth| web[ai-sops-editor]
+  web -->|SOPS decrypt/edit in memory| key[(server key<br/>Fernet keyring /data)]
+  web -->|commit + push| repo[(git repository<br/>with SOPS files)]
+  repo -->|pull + docker build| host[server / k8s]
+  web -.->|clones/uploads/backups| pvc[(/data)]
 ```
 
-Приватный ключ не попадает в браузер: он отправляет путь или шифротекст, сервер
-расшифровывает его через `sops`, а открытый текст идёт только по аутентифицированному
-HTTPS-соединению в одну вкладку. GitLab — единственный источник истины; деплой
-запускается тегом и Argo CD.
+The browser never receives the private key: it sends the path (or the ciphertext),
+the server decrypts with `sops`, and the plaintext travels only over the
+authenticated HTTPS connection to a single tab. The repository with the encrypted
+files stays the source of truth; the app only commits the file it edited.
 
-## Быстрый старт
+## Quick start
 
 ### Windows (Docker Desktop)
 
-1. Установите и запустите Docker Desktop.
-2. Запустите `start-windows.cmd` — скрипт спросит каталог с SOPS-файлами, соберёт
-   образ и откроет `http://localhost:8787`. Ярлык создаётся
-   `windows\install-shortcut.ps1`.
-3. При необходимости положите age-ключ в `keys/age.txt` или вставьте его в UI позже.
-   Остановка — `stop-windows.cmd`.
+1. Install and start Docker Desktop.
+2. Run `start-windows.cmd` — it asks for the directory with SOPS files, builds the
+   image and opens `http://localhost:8787`.
+   A shortcut can be created with `windows\install-shortcut.ps1`.
+3. Optional: put the age key into `keys/age.txt`, or paste it in the UI later.
+   Stop with `stop-windows.cmd`.
 
 ### Linux / macOS (Docker Compose)
 
 ```bash
-git clone git@gitlab.vitebsk.energo.net:opo/neuro-ai/ai-sops-editor.git
-cd ai-sops-editor
+git clone https://github.com/DzmitrySha/sops-editor.git
+cd sops-editor
 cp docker/.env.example docker/.env
 cp docker/.env.secrets.example docker/.env.secrets
 # docker/.env: SOPS_EDITOR_WORKSPACE=/path/to/repo
@@ -103,238 +109,211 @@ docker compose --env-file docker/.env --env-file docker/.env.secrets up -d --bui
 # http://localhost:8787
 ```
 
-Каталог хоста монтируется как `/workspace`; пути в интерфейсе — контейнерные,
-например `/workspace/secrets/app.enc.yaml`.
+The host directory is mounted as `/workspace`; paths in the UI are container
+paths, e.g. `/workspace/secrets/app.enc.yaml`.
 
-> По умолчанию порт слушает только `127.0.0.1`, Basic auth выключен. Это допустимо
-> только на localhost — для сервера см. [деплой](docs/ru/DEPLOY.md).
+> By default the port listens on `127.0.0.1` only and Basic auth is disabled.
+> That is acceptable on localhost only — for a server see
+> [deployment](docs/DEPLOY.md).
 
 <details>
-<summary>Если <code>docker compose … up --build</code> падает с <code>failed to execute bake</code></summary>
+<summary>If <code>docker compose … up --build</code> fails with <code>failed to execute bake</code></summary>
 
-Часть сборок Compose не умеет Bake. Соберите образ напрямую и запустите:
+Some Compose builds cannot use Bake. Build directly, then start:
 
 ```bash
 docker build -t ai-sops-editor:local .
 docker compose --env-file docker/.env --env-file docker/.env.secrets up -d
 ```
 
-В `start-windows.cmd` этот fallback уже есть.
+`start-windows.cmd` already contains this fallback.
 </details>
 
-## Примеры файлов
+## Try it with the demo files
 
-В репозитории есть готовые примеры: Kubernetes-секрет, вложенный YAML, JSON, dotenv
-и INI, плюс открытые двойники для сценария «зашифровать с нуля».
+The repository ships ready-made examples: a Kubernetes-style secret, nested YAML,
+JSON, dotenv and INI, plus plaintext twins for the "encrypt from scratch" flow.
 
 ```bash
-cp keys/age.example.txt keys/age.txt     # демо-ключ; Windows: copy keys\age.example.txt keys\age.txt
+cp keys/age.example.txt keys/age.txt     # demo key, Windows: copy keys\age.example.txt keys\age.txt
 ```
 
-Откройте `/workspace/examples/secrets/app.enc.yaml` во вкладке **«Файл на сервере»**
-или загрузите `workspace/examples/plain/config.json` во вкладке **«С компьютера»** и
-нажмите **«Зашифровать»**.
+Then open `/workspace/examples/secrets/app.enc.yaml` in the **Server file** tab, or
+upload `workspace/examples/plain/config.json` in the **From computer** tab and
+press **Encrypt**.
 
-> `keys/age.example.txt` — публичный демо-ключ, он защищает только примеры.
-> Никогда не используйте его для настоящих секретов.
+> `keys/age.example.txt` is public on purpose: it only protects the example files.
+> Never use it for real secrets.
 
-## Файлы с компьютера
+## Files from your computer
 
-1. Вкладка **«С компьютера»** → **«Выбрать файл»** или перетащите файл в зону.
-   Chrome/Edge запоминает файл через File System Access API; остальные браузеры
-   используют обычный диалог. Открытый YAML/JSON/dotenv/INI тоже открывается.
-2. Нет серверного ключа? Появится окно **«Ключ»** — вставьте `AGE-SECRET-KEY-1…`;
-   ключ остаётся в памяти процесса, файл откроется сразу.
-3. Правьте и нажимайте **«Сохранить»** — сервер зашифрует файл и сразу перезапишет
-   исходный локальный файл. Если браузер не дал права на запись, файл скачается.
-4. Кнопка **«Скачать»** в верхней панели доступна для любого файла. Если локальный
-   файл лежит в git-репозитории, закоммитьте его своим `git` после перезаписи; для
-   коммита/push из интерфейса используйте смонтированный `/workspace`.
+1. Open the **From computer** tab and press **Choose file** (the standard browser
+   dialog) or drop a file onto the zone. A status line shows the name, size and
+   progress; a plain YAML/JSON/dotenv/INI opens as well.
+2. No server key? The **Key** dialog appears — paste `AGE-SECRET-KEY-1…`; it is
+   kept in process memory and the file opens right after.
+3. Edit, then **Save**.
+4. **Download encrypted** in the left panel and replace the file in your project,
+   or — in Chrome/Edge — **Write to source file**, which writes through the File
+   System Access API and only asks for overwrite confirmation. Press
+   **Allow overwriting the file…** once if the plain dialog was used.
 
-> Браузер не отдаёт полный локальный путь. Инструмент работает с выбранным файлом;
-> для работы с целым репозиторием смонтируйте его как `/workspace`.
+> Browsers do not expose the full local path. The tool works with the chosen file;
+> to work with a whole repository, mount it as `/workspace`.
 
-## Ключи
+## Keys
 
-| Источник | Как задать | Примечания |
+| Source | How to set | Notes |
 |---|---|---|
-| Файл на сервере | `keys/age.txt` → `/keys/age.txt` | `chmod 600`, владелец — пользователь контейнера (по умолчанию root) |
-| Переменные | `SOPS_AGE_KEY` / `SOPS_AGE_KEY_FILE` | PGP/KMS используют свои переменные и креды |
-| Сессия UI | Кнопка **«Ключ»** → вставить `AGE-SECRET-KEY-1…` | память процесса, TTL 8 ч, привязан к cookie вкладки |
-| Серверное хранилище | **«Ключ»** → «Серверный ключ» → вставить и обновить | хранится зашифрованным в `/data/server-key`; прочитать через UI нельзя |
-
-Серверное хранилище включается мастер-ключом `SOPS_EDITOR_KEYSTORE_KEY`
-(Fernet; генерируется командой `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`).
-Мастер-ключ не входит в образ и не должен коммититься — храните его в Docker/K8s
-secret. UI отдаёт только публичных получателей и отпечаток; endpoint для чтения
-приватного ключа отсутствует. Ключ не «зашивается» в исходники или образ: иначе
-он неизбежно утечёт вместе с репозиторием/слоем образа.
+| Encrypted server store | **Key** → **Server key** → paste and update | `/data/server-key/keyring.json`; replace-only, no read endpoint |
+| Server file | `keys/age.txt` → `/keys/age.txt` | `chmod 600`, owned by the container user (root by default) |
+| Environment | `SOPS_AGE_KEY` / `SOPS_AGE_KEY_FILE` | PGP/KMS use their usual variables and credentials |
+| UI session | **Key** button → paste `AGE-SECRET-KEY-1…` | process memory, TTL 8 h, bound to the tab cookie |
 
 ```bash
 age-keygen -o age.txt
-grep 'public key' age.txt   # этого получателя добавьте в .sops.yaml
+grep 'public key' age.txt   # add this recipient to .sops.yaml
 ```
 
-Получатель должен уже быть в `.sops.yaml` репозитория: инструмент не меняет
-получателей. Без подходящего приватного ключа расшифровка невозможна — диалог
-показывает получателей из файла, а в справке есть раздел «Нет ключа».
+The recipient must already be in the repository's `.sops.yaml`: the tool never
+changes recipients. Without the matching private key decryption is impossible —
+the dialog shows which recipients the file expects, and the in-app guide has a
+"No key" section on where to look for age/PGP/KMS keys.
 
-## Как устроено сохранение
+## How saving works
 
-1. Сервер читает актуальный шифротекст и сравнивает SHA-256 с тем, что видел браузер
-   (защита от перезаписи параллельной правки).
-2. Делает резервную копию шифротекста в `/data/backups/<hash>/`.
-3. Записывает присланный открытый текст в файл `0600` в приватном каталоге `0700`.
-4. Запускает `sops edit <файл>`: SOPS расшифровывает оригинал, вызывает одноразовый
-   «редактор», шифрует обратно **с исходными метаданными** и обновляет MAC/`lastmodified`.
-5. Расшифровывает результат и сверяет данные с присланными; при ошибке оригинал
-   восстанавливается атомарно.
-6. Удаляет временный открытый текст в `finally`.
+1. The server reads the current ciphertext and compares its SHA-256 with what the
+   browser saw (protects against overwriting a concurrent edit).
+2. Writes a ciphertext backup to `/data/backups/<hash>/`.
+3. Puts the submitted plaintext into a `0600` file inside a private `0700` directory.
+4. Runs `sops edit <file>`: SOPS decrypts the original, calls the one-shot editor,
+   re-encrypts **with the original metadata** and updates the MAC/`lastmodified`.
+5. Decrypts the result and compares the data with what was submitted; on error the
+   original ciphertext is restored atomically.
+6. Deletes the temporary plaintext in `finally`.
 
-В любой момент на диске лежит либо старый, либо новый шифротекст.
+At any moment the file on disk is either the old or the new ciphertext.
 
 ## Git
 
-- **Коммит** — `git add -- <файл>` + `git commit -- <файл>`; только текущий файл.
-  Автор и committer жёстко задаются на сервере через
-  `SOPS_EDITOR_GIT_AUTHOR_NAME` / `SOPS_EDITOR_GIT_AUTHOR_EMAIL`; в UI полей
-  личности нет. Email должен совпадать с подтверждённым email сервисного
-  аккаунта GitLab, иначе коммит не привяжется к пользователю; при push rules
-  с требованием verified email push может быть отклонён. В сообщение
-  автоматически добавляется трейлер `Made-with: SOPS Editor`.
-- **Push** — `git push`; для HTTPS задайте `SOPS_EDITOR_GIT_TOKEN` (GitLab `oauth2`),
-  для SSH смонтируйте ключ/agent.
-- **SSH** — host `~/.ssh` монтируется read-only в `/ssh`; приватный ключ
-  (`id_ed25519`/`id_ecdsa`/`id_rsa`) копируется в `0600` на время операции.
-  Поддерживаются `git@host:group/repo.git` и `ssh://git@host:port/...`.
-  Для `ssh-agent` пробросьте `SSH_AUTH_SOCK`; для GitLab лучше отдельный deploy key.
-  `start-windows.cmd` сам подставляет `%USERPROFILE%\.ssh`, если переменная не задана.
-- **Клон** — URL + ветка + необязательная **папка** в `/data/repos/<name>`.
-  HTTPS-токен задаётся только на сервере (`SOPS_EDITOR_GIT_TOKEN`). С папкой
-  используется partial clone + sparse checkout: скачивается только она и
-  корневые файлы вроде `.sops.yaml`, а не весь репозиторий.
-- **Pull** — только `--ff-only` и только при чистом worktree.
-- **Аудит IP** — при открытии UI (`/`, `/help.html`) в `/data/logs/sops-editor.log`
-  пишется `UI opened from <IP> ...`; изменения (`POST`/`PUT`/`PATCH`/`DELETE`)
-  логируются с IP и пользователем из auth. За обратным прокси задайте
-  `SOPS_EDITOR_TRUST_PROXY=true`, чтобы брался первый адрес
-  `X-Forwarded-For`; без прокси пишется адрес TCP-соединения.
+- **Commit** — `git add -- <file>` + `git commit -- <file>`; only the current file.
+  Author and committer are fixed on the server by
+  `SOPS_EDITOR_GIT_AUTHOR_NAME` / `SOPS_EDITOR_GIT_AUTHOR_EMAIL`; the UI has no
+  editable identity fields. The email should belong to a verified service
+  account on your git host, otherwise the commit is unverified and push rules
+  may reject it. The app appends `Made-with: SOPS Editor`.
+- **Push** — `git push`; for HTTPS set `SOPS_EDITOR_GIT_TOKEN` (GitLab `oauth2`,
+  GitHub `x-access-token`), for SSH mount a key/agent.
+- **Clone** — HTTPS or SSH URL + branch + optional folder into `/data/repos/<name>`.
+  A folder uses partial clone + sparse checkout (only that folder and root config).
+  Clones can be deleted from the file picker or the clones dialog; unused clones
+  expire after `SOPS_EDITOR_GIT_CLONE_TTL_DAYS` days (`0` disables cleanup).
+- **Pull** — `--ff-only`, only with a clean worktree.
+- **Audit** — opening the UI writes `UI opened from <IP>` to
+  `/data/logs/sops-editor.log`; mutating requests log the client IP and
+  authenticated user. Behind a proxy set `SOPS_EDITOR_TRUST_PROXY=true` to use
+  the first `X-Forwarded-For` hop.
 
-## Деплой: Docker и NeuroAI k8s
-
-### Lab/work Compose за Traefik
+## Deploy on a server behind Traefik
 
 ```bash
 cp docker/.env.example docker/.env
 cp docker/.env.secrets.example docker/.env.secrets
 # docker/.env:
 #   SOPS_EDITOR_WORKSPACE=/srv/git/secrets
-#   SOPS_EDITOR_FQDN=ai-sops-editor.vitebsk.energo.net
+#   SOPS_EDITOR_FQDN=sops-editor.example.com
 #   SOPS_EDITOR_TRUST_PROXY=true
 #   SOPS_EDITOR_COOKIE_SECURE=true
 # docker/.env.secrets:
-#   SOPS_EDITOR_AUTH_PASSWORD=<длинный случайный пароль>
+#   SOPS_EDITOR_AUTH_PASSWORD=<long random password>
 
 docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
   --env-file docker/.env --env-file docker/.env.secrets up -d --build
 ```
 
-Нужна внешняя сеть `traefik_proxy`. Подробности:
-[docs/ru/DEPLOY.md](docs/ru/DEPLOY.md) · [docs/ru/SECURITY.md](docs/ru/SECURITY.md).
+An external `traefik_proxy` network is required. Details:
+[docs/DEPLOY.md](docs/DEPLOY.md) · [SECURITY.md](SECURITY.md) ·
+[Русская версия](docs/ru/DEPLOY.md).
 
-### Prod NeuroAI (k8s + GitOps)
+### Kubernetes
 
-- FQDN: `ai-sops-editor.vitebsk.energo.net`; lab/work — `ai-sops-editor-dev.vitebsk.energo.net`.
-- Namespace / Argo Application: `ai-sops-editor`.
-- Образ: `ai-registry.vitebsk.energo.net/ai-sops-editor/ai-sops-editor`.
-- Манифесты: `infra/k8s`; разовый bootstrap — `infra/bootstrap/ai-sops-editor.yaml`.
-- Секреты: SOPS `infra/k8s/ai-sops-editor-secret.enc.yaml` через KSOPS.
-- PVC: `ai-sops-editor-data` → `/data`; одна реплика, `Recreate`.
-- CI: `.gitlab-ci.yml`; **любой git tag** → decide → BuildKit/retag → bump `newTag` → Argo Sync.
+Kustomize manifests live in [`infra/k8s`](infra/k8s): one Deployment, a PVC for
+`/data`, ConfigMap settings and a SOPS-encrypted Secret (`KSOPS` or your GitOps
+controller decrypts it). Replace `registry.example.com`,
+`sops-editor.example.com` and the Argo `repoURL` in
+[`infra/bootstrap/ai-sops-editor.yaml`](infra/bootstrap/ai-sops-editor.yaml)
+with your own values — see [docs/DEPLOY-K8S-FIRST-RUN.md](docs/DEPLOY-K8S-FIRST-RUN.md).
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+## Configuration
 
-Порядок первого выката: [docs/DEPLOY-K8S-FIRST-RUN.md](docs/DEPLOY-K8S-FIRST-RUN.md).
-Канон и отклонения: [docs/DEPLOY-STANDARD.md](docs/DEPLOY-STANDARD.md).
+All settings are environment variables with the `SOPS_EDITOR_` prefix (plus the
+standard `SOPS_AGE_KEY_FILE` / `SOPS_AGE_KEY`):
 
-## Настройки
-
-Все настройки — переменные окружения с префиксом `SOPS_EDITOR_` (плюс стандартные
-`SOPS_AGE_KEY_FILE` / `SOPS_AGE_KEY`):
-
-| Переменная | По умолчанию | Назначение |
+| Variable | Default | Purpose |
 |---|---|---|
-| `SOPS_EDITOR_ROOTS` | `/workspace\|/data/repos` | разрешённые корни, `\|` или `os.pathsep` |
-| `SOPS_EDITOR_STORAGE` | `/data` | бэкапы, загрузки, клоны, логи |
-| `SOPS_AGE_KEY_FILE` | `/keys/age.txt` (если есть) | приватный age-ключ |
-| `SOPS_EDITOR_AUTH_USER` / `_PASSWORD` | `sops` / пусто | HTTP Basic auth |
-| `SOPS_EDITOR_AUTH_MODE` | `basic` | `basic` · `header` (OIDC-прокси) · `none` |
-| `SOPS_EDITOR_AUTH_HEADER` | `X-Forwarded-User` | заголовок личности в режиме `header` |
-| `SOPS_EDITOR_AUTH_TRUSTED_PROXIES` | пусто | список IP/CIDR, которым разрешено его ставить |
-| `SOPS_EDITOR_MAX_FILE_BYTES` | `5242880` | лимит файла |
-| `SOPS_EDITOR_BACKUP_KEEP` | `10` | копий на файл |
-| `SOPS_EDITOR_SESSION_TTL_SECONDS` | `28800` | TTL ключа в UI |
-| `SOPS_EDITOR_ALLOW_GIT_CLONE` | `true` | разрешить клонирование |
-| `SOPS_EDITOR_GIT_CLONE_TTL_DAYS` | `7` | автоудаление неиспользуемых клонов; `0` отключает |
-| `SOPS_EDITOR_GIT_ALLOWED_HOSTS` | пусто | allowlist хостов для клона |
-| `SOPS_EDITOR_GIT_TOKEN` | пусто | HTTPS-токен git |
-| `SOPS_EDITOR_HOST_SSH_DIR` | `./.ssh-host` | host-каталог `~/.ssh`, монтируется в `/ssh` |
-| `SOPS_EDITOR_GIT_AUTHOR_NAME` | `sops-editor` | фиксированное имя автора/committer |
-| `SOPS_EDITOR_GIT_AUTHOR_EMAIL` | `sopseditor@vitebsk.energo.net` | фиксированный email автора/committer |
-| `SOPS_EDITOR_GIT_SSH_KEY` | пусто | явный ключ в контейнере; пусто = автопоиск |
-| `SOPS_EDITOR_GIT_SSH_STRICT_HOST_KEY_CHECKING` | `accept-new` | `accept-new` · `yes` · `no` |
-| `SOPS_EDITOR_KEYSTORE_KEY` | пусто | мастер-ключ Fernet для серверного хранилища |
-| `SOPS_EDITOR_TRUST_PROXY` / `_COOKIE_SECURE` | `false` | за обратным прокси |
-| `SOPS_EDITOR_LOG_LEVEL` | `INFO` | уровень loguru |
+| `SOPS_EDITOR_ROOTS` | `/workspace\|/data/repos` | allowed roots, `\|` or `os.pathsep` |
+| `SOPS_EDITOR_STORAGE` | `/data` | backups, uploads, cloned repositories, logs |
+| `SOPS_AGE_KEY_FILE` | `/keys/age.txt` (if present) | private age key |
+| `SOPS_EDITOR_AUTH_USER` / `_PASSWORD` | `sops` / empty | HTTP Basic auth |
+| `SOPS_EDITOR_AUTH_MODE` | `basic` | `basic` · `header` (OIDC proxy) · `none` |
+| `SOPS_EDITOR_AUTH_HEADER` | `X-Forwarded-User` | identity header trusted in `header` mode |
+| `SOPS_EDITOR_AUTH_TRUSTED_PROXIES` | empty | IP/CIDR list allowed to set that header |
+| `SOPS_EDITOR_MAX_FILE_BYTES` | `5242880` | file size limit |
+| `SOPS_EDITOR_BACKUP_KEEP` | `10` | ciphertext copies per file |
+| `SOPS_EDITOR_SESSION_TTL_SECONDS` | `28800` | UI key TTL |
+| `SOPS_EDITOR_ALLOW_GIT_CLONE` | `true` | allow cloning |
+| `SOPS_EDITOR_GIT_CLONE_TTL_DAYS` | `7` | remove unused clones; `0` disables cleanup |
+| `SOPS_EDITOR_GIT_AUTHOR_NAME` | `sops-editor` | fixed author/committer name |
+| `SOPS_EDITOR_GIT_AUTHOR_EMAIL` | `sops-editor@example.com` | fixed author/committer email |
+| `SOPS_EDITOR_GIT_ALLOWED_HOSTS` | empty | clone host allowlist |
+| `SOPS_EDITOR_GIT_TOKEN` | empty | HTTPS git token |
+| `SOPS_EDITOR_TRUST_PROXY` / `_COOKIE_SECURE` | `false` | behind a reverse proxy |
+| `SOPS_EDITOR_LOG_LEVEL` | `INFO` | loguru level |
 
 ## HTTP API
 
-| Метод | Путь | Назначение |
+| Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/health` | здоровье, версия sops |
-| GET | `/api/status` | корни, auth, источник ключа |
-| GET | `/api/browse?path=` | листинг каталога |
-| GET | `/api/search?q=&path=` | поиск файлов |
-| GET | `/api/file?path=` | расшифровать и открыть (и обычные файлы) |
-| POST | `/api/file` | зашифровать/сохранить |
-| GET/POST | `/api/file/job?op=` | то же с идентификатором операции |
-| GET | `/api/ops/{id}` | статус, события, результат операции |
-| POST | `/api/upload?name=&op=` | загрузка с компьютера (raw body) |
-| POST | `/api/encrypt/upload?name=&recipients=` | зашифровать загруженный файл |
-| POST | `/api/encrypt` | зашифровать серверный файл |
-| GET | `/api/download?path=` | скачать загруженный файл |
-| GET | `/api/backups?path=` | список копий |
-| GET | `/api/backups/{id}?path=` | скачать копию |
-| POST / DELETE | `/api/session/key` | задать / забыть age-ключ вкладки |
-| GET / PUT | `/api/server-key` | статус / обновить серверный ключ (только запись) |
+| GET | `/api/health` | health, sops version |
+| GET | `/api/status` | roots, auth, key source |
+| GET | `/api/browse?path=` | directory listing |
+| GET | `/api/search?q=&path=` | search files |
+| GET | `/api/file?path=` | decrypt and open (plain files too) |
+| POST | `/api/file` | encrypt/save |
+| GET/POST | `/api/file/job?op=` | same, with a progress operation id |
+| GET | `/api/ops/{id}` | operation status, events, result |
+| POST | `/api/upload?name=&op=` | upload from the computer (raw body) |
+| POST | `/api/encrypt/upload?name=&recipients=` | encrypt a plain uploaded file |
+| POST | `/api/encrypt` | encrypt a plain server file |
+| GET | `/api/download?path=` | download an uploaded file |
+| GET | `/api/backups?path=` | list backups |
+| GET | `/api/backups/{id}?path=` | download a backup |
+| POST / DELETE | `/api/session/key` | set / forget the tab age key |
 | GET | `/api/git?path=` | git status |
-| POST | `/api/git/commit` · `/push` · `/pull` · `/clone` | git-действия |
-| GET | `/api/git/diff?path=&op=` | расшифрованный файл и его версия из `HEAD` |
-| POST | `/api/keys/rotate` | ротация ключей `updatekeys` / `rotate` (`{path, mode}`) |
+| POST | `/api/git/commit` · `/push` · `/pull` · `/clone` | git actions |
+| GET | `/api/git/diff?path=&op=` | decrypted file and its `HEAD` version |
+| POST | `/api/keys/rotate` | `updatekeys` / `rotate` re-keying (`{path, mode}`) |
 
-Встроенная справка следует языку приложения: `?lang=ru` или `?lang=en` на
+The interactive documentation follows the app language: `?lang=en` on
 `/help.html`.
 
-## Разработка и тесты
+## Development and tests
 
-Зависимости управляются через [uv](https://docs.astral.sh/uv/) и зафиксированы в
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) and pinned in
 `backend/uv.lock`:
 
 ```bash
 cd backend
-uv sync --extra test        # создаёт backend/.venv по uv.lock
-uv run pytest -q            # 49 тестов
+uv sync --extra test        # creates backend/.venv from uv.lock
+uv run pytest -q            # 56 tests
 uv run ruff check app tests
 ```
 
-Тесты работают с настоящими `sops` и `age-keygen`. На Windows положите бинарники в
-`.tools/` (`sops.exe`, `age/age-keygen.exe`) или добавьте их в `PATH`; в Docker-образе
-они уже есть. Без бинарников такие тесты пропускаются.
+The tests run against real `sops` and `age-keygen`. On Windows put the binaries
+into `.tools/` (`sops.exe`, `age/age-keygen.exe`) or add them to `PATH`; the Docker
+image already ships them. Tests that need the binaries are skipped otherwise.
 
-Запуск без Docker:
+Run without Docker:
 
 ```bash
 cd backend
@@ -342,53 +321,58 @@ SOPS_EDITOR_ROOTS="D:/repo|D:/tmp/repos" SOPS_AGE_KEY_FILE="D:/keys/age.txt" \
   uv run uvicorn app.main:create_app --factory --port 8787
 ```
 
-Фронтенд — статические файлы, сборки нет: правьте `frontend/*.js|css|html` и
-обновляйте страницу.
+The frontend is plain static files — no build step. Edit `frontend/*.js|css|html`
+and reload the page.
 
-## Структура проекта
+## Project structure
 
 ```text
-backend/app/        FastAPI: sops, файлы, git, сессии, безопасность
-backend/tests/      pytest с настоящим sops
-backend/uv.lock     зафиксированный набор зависимостей (uv)
-frontend/           статический UI (CodeMirror рядом), help.html + help.en.html, i18n.js
-docker/             примеры окружения
-docker-compose*.yml локальный / Traefik / офлайн
-start-windows.cmd   запуск на Windows
-windows/            установщик ярлыка
-docs/               деплой, безопасность, скриншоты (ru/ — русские версии)
-infra/              Kustomize, SOPS Secret, Argo bootstrap
-.gitlab-ci.yml      GitLab CI: tag → image → bump
-README.md           русская версия — её показывает GitLab
+backend/app/        FastAPI: sops, files, git, sessions, security
+backend/tests/      pytest against real sops
+backend/uv.lock     locked dependency set (uv)
+frontend/           static UI (vendored CodeMirror), help.html + help.en.html, i18n.js
+docker/             environment examples
+docker-compose*.yml local / Traefik / offline overlays
+start-windows.cmd   Windows launcher
+windows/            shortcut installer
+docs/               deployment, security, screenshots (ru/ for Russian)
+infra/              Kustomize manifests, SOPS Secret, Argo bootstrap
+README.md           English version — shown on GitHub
+README.ru.md        Russian version — GitHub language switcher
 ```
 
-## Планы
+## Roadmap
 
-- [x] Открытые файлы и «зашифровать с нуля»
-- [x] Реальный прогресс вместо буферизованного ответа
-- [x] Интерфейс и документация RU/EN
-- [x] Ротация ключей (`sops updatekeys` / `rotate`) из UI
-- [x] Diff расшифрованных значений рядом с git-версией
-- [x] Опциональный OIDC перед Basic auth (доверенный заголовок от прокси)
+- [x] Plaintext files and "encrypt from scratch"
+- [x] Real progress instead of buffered responses
+- [x] RU/EN interface and documentation
+- [x] Key rotation helper (`sops updatekeys` / `rotate`) from the UI
+- [x] Git diff view with decrypted values side by side
+- [x] Optional OIDC in front of Basic auth (trusted header from a reverse proxy)
 
-## Ограничения
+## Limits
 
-- Не редактирует **бинарные** SOPS-файлы (только YAML / JSON / dotenv / INI).
-- Нет управления получателями/KMS: политика берётся из файла и `.sops.yaml`;
-  для ротации — `sops updatekeys` / `sops rotate`.
-- Нет многопользовательской модели: Basic auth, один серверный ключ или ключи
-  по сессиям.
-- Сборка образа требует интернета (sops/age/pip); офлайн-сборка не входит.
-- Браузер не может записать произвольный путь — только файл, дескриптор которого
-  держит (Chrome/Edge), иначе скачивание.
+- No **binary** SOPS files (YAML / JSON / dotenv / INI only).
+- No recipient/KMS management: the policy comes from the file and `.sops.yaml`;
+  use `sops updatekeys` / `sops rotate` for rotation.
+- No multi-user model: Basic auth, one server key or per-session keys.
+- Image build needs internet (sops/age/pip); offline builds are not included.
+- The browser cannot write an arbitrary path — only a file whose handle it holds
+  (Chrome/Edge), otherwise download.
 
-## Участие
+## Contributing
 
-Issues и merge requests — в GitLab-проекте
-[`opo/neuro-ai/ai-sops-editor`](https://gitlab.vitebsk.energo.net/opo/neuro-ai/ai-sops-editor).
-Об уязвимостях сообщайте приватно согласно [SECURITY.md](SECURITY.md), не в
-публичный issue.
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+For vulnerabilities please use [private reporting](SECURITY.md), not a public issue.
 
-## Лицензия
+## License
 
 [MIT](LICENSE) © 2026 Dzmitry.
+
+<div align="center">
+<sub>If this tool saves you time, a ⭐ helps others find it.</sub>
+</div>
+
+<a href="https://star-history.com/#DzmitrySha/sops-editor&Date">
+  <img src="https://api.star-history.com/svg?repos=DzmitrySha/sops-editor&type=Date" alt="Star history" width="720">
+</a>

@@ -1,5 +1,5 @@
 # Argo CD Application — ai-sops-editor.
-# Apply once after the GitLab project, deploy key and registry pull secret exist.
+# Apply once after the git repository, deploy key and registry pull secret exist.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: git@gitlab.vitebsk.energo.net:opo/neuro-ai/ai-sops-editor.git
+    repoURL: git@github.com:DzmitrySha/sops-editor.git
     targetRevision: main
     path: infra/k8s
   destination:

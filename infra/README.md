@@ -1,27 +1,26 @@
-# infra — ai-sops-editor на ai-opo
+# infra — Kubernetes и GitOps
 
-Проект — **один контейнер** (FastAPI + статический SPA). Это осознанное отклонение
-от двухсервисного `ai-template`: отдельного frontend/nginx, БД и миграций нет.
+Проект — **один контейнер** (FastAPI + статический SPA): отдельного frontend/nginx,
+БД и миграций нет.
 
 ## GitOps
 
 ```text
-git tag → decide-image → BuildKit/retag → ai-registry → bump newTag → Argo sync
+git tag → build image → registry → bump newTag → Argo CD sync
 ```
 
-- CI: корневой [`.gitlab-ci.yml`](../.gitlab-ci.yml), runner `ai-k8s`.
-- Образ: `ai-registry.vitebsk.energo.net/ai-sops-editor/ai-sops-editor:<tag>`.
-- Namespace и Argo Application: `ai-sops-editor`.
+- Сборка образа и проверки: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+- Образ: `registry.example.com/ai-sops-editor/ai-sops-editor:<tag>` (заглушка,
+  замените на свой registry).
+- Namespace и Argo CD Application: `ai-sops-editor`.
 - Манифесты: [`k8s/`](k8s/); разовый bootstrap: [`bootstrap/ai-sops-editor.yaml`](bootstrap/ai-sops-editor.yaml).
-- CI-переменные: `GIT_PUSH_TOKEN`, `REGISTRY_PASSWORD`.
-- Override авто-выбора: `BUILD_IMAGES=all|ai-sops-editor`.
 
 ## FQDN
 
 | Контур | Host |
 |---|---|
-| lab/work Compose + Traefik | `ai-sops-editor-dev.vitebsk.energo.net` |
-| prod k8s HTTPRoute | `ai-sops-editor.vitebsk.energo.net` |
+| Compose + Traefik | `sops-editor-dev.example.com` |
+| k8s HTTPRoute | `sops-editor.example.com` |
 
 `-dev` не должен попадать в ConfigMap/HTTPRoute.
 
@@ -32,16 +31,16 @@ git tag → decide-image → BuildKit/retag → ai-registry → bump newTag → 
 - Настройки — ConfigMap `ai-sops-editor-config`.
 - Credentials — SOPS Secret `ai-sops-editor-secret` + KSOPS; plaintext example не коммитить.
 - `SOPS_EDITOR_KEYSTORE_KEY` — Fernet master key для keyring; без него хранилище серверного ключа выключено.
-- `/keys/age.txt` не обязателен: продовый age-ключ импортируется через UI или кладётся в отдельный Secret.
+- `/keys/age.txt` не обязателен: age-ключ импортируется через UI или кладётся в отдельный Secret.
 - SSH deploy key и `known_hosts` при необходимости добавляются в Secret; Deployment монтирует их в `/ssh`.
 
 ## Bootstrap (один раз)
 
-1. GitLab project, deploy key → Argo Secret `repo-ai-sops-editor`.
-2. Registry pull secret `ai-registry-pull` в namespace.
+1. Git-репозиторий и deploy key → Argo CD Secret `repo-ai-sops-editor`.
+2. Registry pull secret `registry-pull` в namespace.
 3. Заполнить `ai-sops-editor-secret.enc.yaml` реальными credentials.
 4. `kubectl apply -f infra/bootstrap/ai-sops-editor.yaml`.
-5. `git tag v0.1.0 && git push origin v0.1.0`; дождаться bump; Sync Argo.
-6. Открыть FQDN и импортировать продовый age-ключ в «Серверный ключ».
+5. Собрать образ с тегом, обновить `newTag` в `k8s/kustomization.yaml`, Sync Argo CD.
+6. Открыть FQDN и импортировать age-ключ в «Серверный ключ».
 
-CI не расшифровывает SOPS; это делает только KSOPS при Argo Sync.
+CI не расшифровывает SOPS; это делает только KSOPS при Sync.

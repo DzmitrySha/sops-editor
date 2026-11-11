@@ -18,7 +18,6 @@ frontend/vendor/**/*.map
 .github
 docs
 infra
-.gitlab-ci.yml
 .offline-docker.json
 README.md
 README.ru.md

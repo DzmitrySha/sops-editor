@@ -37,5 +37,5 @@ docker compose -f docker-compose.yml -f docker-compose.traefik.yml \
 
 ## Профили
 
-OIDC/Keycloak-профилей нет. `NEUROAI_PROFILE` не используется. Для будущего OIDC
+OIDC/Keycloak-профилей нет. Для будущего OIDC
 можно включить `SOPS_EDITOR_AUTH_MODE=header` за доверенным прокси.

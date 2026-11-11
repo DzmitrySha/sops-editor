@@ -5,8 +5,8 @@
 #
 # docker/.env:
 #   # lab / work:
-#   SOPS_EDITOR_FQDN=ai-sops-editor-dev.vitebsk.energo.net
-#   # prod k8s HTTPRoute — без -dev: ai-sops-editor.vitebsk.energo.net
+#   SOPS_EDITOR_FQDN=sops-editor-dev.example.com
+#   # prod k8s HTTPRoute — без -dev: sops-editor.example.com
 #   SOPS_EDITOR_TRUST_PROXY=true
 #   SOPS_EDITOR_COOKIE_SECURE=true
 #   SOPS_EDITOR_AUTH_PASSWORD=<strong secret>   # in .env.secrets
@@ -22,7 +22,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=traefik_proxy
-      - traefik.http.routers.ai-sops-editor.rule=Host(`${SOPS_EDITOR_FQDN:-ai-sops-editor-dev.vitebsk.energo.net}`)
+      - traefik.http.routers.ai-sops-editor.rule=Host(`${SOPS_EDITOR_FQDN:-sops-editor-dev.example.com}`)
       - traefik.http.routers.ai-sops-editor.entrypoints=websecure
       - traefik.http.routers.ai-sops-editor.tls=true
       - traefik.http.services.ai-sops-editor.loadbalancer.server.port=8080

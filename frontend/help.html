@@ -203,7 +203,7 @@ sops --encrypt --filename-override secret.enc.yaml secret.yaml &gt; secret.enc.y
         <table class="doc-table">
           <thead><tr><th>Кнопка</th><th>Что делает</th></tr></thead>
           <tbody>
-            <tr><td>Коммит</td><td><code>git add -- файл</code> + <code>git commit -- файл</code>; в коммит попадает только открытый файл. Имя и email автора/committer заданы на сервере через <code>SOPS_EDITOR_GIT_AUTHOR_NAME</code>/<code>_EMAIL</code>; в UI их изменить нельзя. Email должен совпадать с подтверждённым email сервисного аккаунта GitLab. В сообщение добавляется <code>Made-with: SOPS Editor</code>. Галочка «запушить» делает push после коммита.</td></tr>
+            <tr><td>Коммит</td><td><code>git add -- файл</code> + <code>git commit -- файл</code>; в коммит попадает только открытый файл. Имя и email автора/committer заданы на сервере через <code>SOPS_EDITOR_GIT_AUTHOR_NAME</code>/<code>_EMAIL</code>; в UI их изменить нельзя. Email должен совпадать с подтверждённым email сервисного аккаунта на git-хосте. В сообщение добавляется <code>Made-with: SOPS Editor</code>. Галочка «запушить» делает push после коммита.</td></tr>
             <tr><td>↻ (pull)</td><td><code>git pull --ff-only</code>, только при чистом рабочем дереве. После pull файл перезагружается.</td></tr>
             <tr><td>Дифф с HEAD</td><td>Открывает окно «Изменения» сразу на вкладке «С HEAD»: сервер расшифровывает версию из <code>HEAD</code> и текущий файл, они показываются рядом в две колонки с номерами строк. Обе стороны расшифровываются в памяти сервера, в браузер уходит уже открытый текст, как и при обычном открытии файла.</td></tr>
             <tr><td>Из git</td><td><code>git clone</code> в <code>/data/repos/&lt;имя&gt;</code>; необязательная папка.</td></tr>

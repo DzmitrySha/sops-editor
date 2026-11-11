@@ -6,11 +6,11 @@
 |---|---|---|
 | Windows / localhost | `start-windows.cmd` или compose | `127.0.0.1:8787`, без auth по умолчанию |
 | Linux VM / сервер без Traefik | compose + `SOPS_EDITOR_BIND=0.0.0.0` | обязательно `SOPS_EDITOR_AUTH_PASSWORD` + HTTPS-прокси |
-| Общий сервер (dev) | base compose + `docker-compose.traefik.yml` | shared Traefik, `ai-sops-editor-dev.vitebsk.energo.net`, Basic auth |
-| Общий сервер (prod) | k8s/HTTPRoute | `ai-sops-editor.vitebsk.energo.net` (без `-dev`), Basic auth |
+| Общий сервер (dev) | base compose + `docker-compose.traefik.yml` | shared Traefik, `sops-editor-dev.example.com`, Basic auth |
+| Общий сервер (prod) | k8s/HTTPRoute | `sops-editor.example.com` (без `-dev`), Basic auth |
 | Офлайн | не поддержано «из коробки» | образ нужно собрать заранее и перенести |
 
-Приложение — **один контейнер**: FastAPI отдаёт API и статический frontend. Отдельный nginx/frontend не нужен; это осознанное отклонение от шаблона `ai-template`.
+Приложение — **один контейнер**: FastAPI отдаёт API и статический frontend. Отдельный nginx/frontend не нужен.
 
 ## Подготовка каталогов
 
@@ -43,9 +43,9 @@ curl -fsS http://127.0.0.1:8787/api/health
    ```dotenv
    SOPS_EDITOR_WORKSPACE=/srv/secrets/repo
    # dev / work:
-   SOPS_EDITOR_FQDN=ai-sops-editor-dev.vitebsk.energo.net
+   SOPS_EDITOR_FQDN=sops-editor-dev.example.com
    # prod (k8s/HTTPRoute, без -dev):
-   # SOPS_EDITOR_FQDN=ai-sops-editor.vitebsk.energo.net
+   # SOPS_EDITOR_FQDN=sops-editor.example.com
    SOPS_EDITOR_TRUST_PROXY=true
    SOPS_EDITOR_COOKIE_SECURE=true
    SOPS_EDITOR_AUTH_USER=sops
@@ -63,7 +63,7 @@ curl -fsS http://127.0.0.1:8787/api/health
 4. Проверка:
    ```bash
    curl -fsS http://127.0.0.1:8787/api/health   # local port остаётся loopback
-   curl -u sops:... https://ai-sops-editor-dev.vitebsk.energo.net/api/status
+   curl -u sops:... https://sops-editor-dev.example.com/api/status
    ```
 
 Сеть `traefik_proxy` должна существовать. Service name `ai-sops-editor` префиксован и не пересекается с другими проектами. TLS — на Traefik.
@@ -123,7 +123,7 @@ curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status | grep ali
 - Контейнер работает от root внутри namespaces, `read_only: true`, `cap_drop: ALL`, `no-new-privileges`; запись только в `/data`, `/workspace`, `/tmp` (tmpfs).
 - Bind-mount `workspace` должен быть доступен на запись пользователю, от которого запускается контейнер. В Linux это обычно root (compose по умолчанию), либо задайте `user:` и владельца каталога.
 - `/keys` монтируется read-only. Файл `age.txt` должен быть читаем контейнеру.
-- Автор и committer коммита жёстко задаются `SOPS_EDITOR_GIT_AUTHOR_NAME/EMAIL`; UI их не переопределяет. Локальные `user.name/email` репозитория игнорируются. Для строгих GitLab push rules используйте подтверждённый email сервисного аккаунта. В сообщение добавляется `Made-with: SOPS Editor`.
+- Автор и committer коммита жёстко задаются `SOPS_EDITOR_GIT_AUTHOR_NAME/EMAIL`; UI их не переопределяет. Локальные `user.name/email` репозитория игнорируются. Для строгих push rules git-хоста используйте подтверждённый email сервисного аккаунта. В сообщение добавляется `Made-with: SOPS Editor`.
 - Git-SSH: задайте `SOPS_EDITOR_HOST_SSH_DIR=$HOME/.ssh` (Compose монтирует каталог read-only в `/ssh`). Приватный `id_ed25519`/`id_ecdsa`/`id_rsa` находится автоматически; можно указать `SOPS_EDITOR_GIT_SSH_KEY=/ssh/<ключ>`. На время операции ключ копируется в файл `0600`; `known_hosts` копируется в `/data/ssh/known_hosts`. Для agent пробросьте `SSH_AUTH_SOCK` в контейнер. Для HTTPS — `SOPS_EDITOR_GIT_TOKEN`.
 - Sparse-клон: необязательное поле «Папка» запускает `git clone --filter=blob:none --sparse` и оставляет только эту папку и корневые файлы вроде `.sops.yaml`.
 - Зашифрованный серверный ключ: хранилище `/data/server-key/keyring.json`, мастер-ключ `SOPS_EDITOR_KEYSTORE_KEY` (Fernet). UI может только заменить ключ; API не отдаёт приватный ключ. Мастер-ключ генерируется один раз и хранится с секретами деплоя: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Без него хранилище выключено, но `/keys/age.txt` продолжает работать.

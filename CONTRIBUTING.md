@@ -48,8 +48,9 @@ translated through the same layer. The documentation has two files:
 
 1. Keep the change focused; one topic per PR.
 2. Run the tests before opening the PR.
-3. Update both READMEs — `.github/README.md` (English, shown on GitHub) and
-   `README.md` (Russian, shown on GitLab) — plus the in-app help when behaviour changes.
+3. Update both READMEs — `README.md` (English, shown by default on GitHub) and
+   `README.ru.md` (Russian, GitHub language switcher) — plus the in-app help when
+   behaviour changes.
 4. Describe the user-visible effect and how you verified it.
 
 Commit messages: short imperative subject (`fix: dedupe decrypt calls`), body

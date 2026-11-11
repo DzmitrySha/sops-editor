@@ -8,8 +8,8 @@ Russian version: [ru/DEPLOY.md](ru/DEPLOY.md).
 |---|---|---|
 | Windows / localhost | `start-windows.cmd` or Compose | `127.0.0.1:8787`, no auth by default |
 | Linux VM / server without Traefik | Compose + `SOPS_EDITOR_BIND=0.0.0.0` | `SOPS_EDITOR_AUTH_PASSWORD` is mandatory + HTTPS proxy |
-| Shared server (dev) | base Compose + `docker-compose.traefik.yml` | shared Traefik, `ai-sops-editor-dev.vitebsk.energo.net`, Basic auth |
-| Shared server (prod) | k8s/HTTPRoute | `ai-sops-editor.vitebsk.energo.net`, Basic auth |
+| Shared server (dev) | base Compose + `docker-compose.traefik.yml` | shared Traefik, `sops-editor-dev.example.com`, Basic auth |
+| Shared server (prod) | k8s/HTTPRoute | `sops-editor.example.com`, Basic auth |
 | Offline | not supported out of the box | build the image in advance and copy it |
 
 The application is a **single container**: FastAPI serves both the API and the
@@ -51,9 +51,9 @@ Port: `SOPS_EDITOR_PORT`. Bind address: `SOPS_EDITOR_BIND` (default `127.0.0.1`)
    ```dotenv
    SOPS_EDITOR_WORKSPACE=/srv/secrets/repo
    # dev / work:
-   SOPS_EDITOR_FQDN=ai-sops-editor-dev.vitebsk.energo.net
+   SOPS_EDITOR_FQDN=sops-editor-dev.example.com
    # prod (k8s/HTTPRoute, without -dev):
-   # SOPS_EDITOR_FQDN=ai-sops-editor.vitebsk.energo.net
+   # SOPS_EDITOR_FQDN=sops-editor.example.com
    SOPS_EDITOR_TRUST_PROXY=true
    SOPS_EDITOR_COOKIE_SECURE=true
    SOPS_EDITOR_AUTH_USER=sops
@@ -71,7 +71,7 @@ Port: `SOPS_EDITOR_PORT`. Bind address: `SOPS_EDITOR_BIND` (default `127.0.0.1`)
 4. Check:
    ```bash
    curl -fsS http://127.0.0.1:8787/api/health   # the local port stays loopback
-   curl -u sops:... https://ai-sops-editor-dev.vitebsk.energo.net/api/status
+   curl -u sops:... https://sops-editor-dev.example.com/api/status
    ```
 
 The `traefik_proxy` network must exist. The service name `ai-sops-editor` is
@@ -140,8 +140,8 @@ curl -s -H 'X-Forwarded-User: alice' http://127.0.0.1:8787/api/status | grep ali
 - `/keys` is mounted read-only. `age.txt` must be readable by the container.
 - Commit identity is fixed by `SOPS_EDITOR_GIT_AUTHOR_NAME/EMAIL`; the UI cannot
   override it. The server sets both author and committer, ignoring repository-local
-  `user.name/email`. Use a verified service-account email for strict GitLab push
-  rules. The app appends `Made-with: SOPS Editor` to the commit message.
+  `user.name/email`. Use a verified service-account email for strict push rules
+  on your git host. The app appends `Made-with: SOPS Editor` to the commit message.
 - Git SSH: set `SOPS_EDITOR_HOST_SSH_DIR=$HOME/.ssh` (Compose mounts it
   read-only at `/ssh`). A private `id_ed25519`/`id_ecdsa`/`id_rsa` is
   auto-detected; override with `SOPS_EDITOR_GIT_SSH_KEY=/ssh/<key>`. The key is
